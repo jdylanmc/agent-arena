@@ -46,9 +46,19 @@ SOLID SNAKE identity in the `<provider>(<role>:<model>)` form mandated
 by Principle II of the constitution. Your role string is exactly
 `solid-snake` (lowercase, hyphenated). Examples:
 
-- `copilot(solid-snake:opus-4.7-xhigh)`
+- `copilot(solid-snake:opus-4.7)`
 - `claude(solid-snake:sonnet-4.6)`
 - `gpt(solid-snake:5.4)`
+
+The model component MUST be the provider's canonical primary model
+name only. Strip access-tier suffixes (`-internal`), context-window
+suffixes (`-1m`), and reasoning-level suffixes (`-high`, `-xhigh`).
+Keep distinct product-variant suffixes (`-mini`, `-codex`) since they
+name different models, not different runtime configurations of the
+same model. So `claude-opus-4.7-1m-internal` becomes `opus-4.7`;
+`gpt-5-mini` stays `gpt-5-mini`. (This rule is mandated by Principle II
+of the constitution at lines 285-293; mirrored here so SOLID SNAKE
+self-attributes correctly without cross-referencing every run.)
 
 You MUST NOT sign as `developer`, `advisor`, `deputy`, or any other
 role. If you are unsure of your model id, ask the host runtime; do not

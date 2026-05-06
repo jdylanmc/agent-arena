@@ -18,6 +18,19 @@ Principle II violation and the deputy will flag them.
 
 ## [Unreleased]
 
+### Changed
+
+- **SOLID SNAKE persona attribution examples normalized** to drop the
+  `-xhigh` reasoning-level suffix per Principle II's model-id
+  convention (`constitution.md:285-293`). Persona examples now read
+  `copilot(solid-snake:opus-4.7)` (was `copilot(solid-snake:opus-4.7-xhigh)`).
+  Mirrored the model-id stripping rule directly into the persona's
+  Attribution section so SOLID SNAKE self-attributes correctly without
+  needing to cross-reference the constitution on every run. Filed in
+  response to SOLID SNAKE's own first-run recommendation
+  (`agents/solid-snake/reports/20260506-171940-solid-snake-report.md`,
+  Persona–constitution consistency section). — copilot(developer:opus-4.7)
+
 ### Added
 
 - **SOLID SNAKE agent persona** under `agents/solid-snake/` — a
