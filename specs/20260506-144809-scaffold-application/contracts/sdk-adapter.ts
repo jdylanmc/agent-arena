@@ -27,16 +27,36 @@ import type {
 } from "@github/copilot-sdk";
 
 /**
- * The seam between the extension and the Copilot SDK.
+ * SOLID note (pre-emptive ISP segregation, anticipating SOLID SNAKE review):
+ * The SDK seam is split into TWO single-responsibility interfaces:
  *
- * Production: `CopilotSdkAdapter` (wraps `CopilotClient` + `CopilotSession`).
- * Test:        `FakeSdkAdapter` (in-memory; satisfies the behavioral contract below).
+ *   - `SdkClientLifecycle`  — start/stop the underlying CopilotClient
+ *   - `SdkSessionRegistry`  — create/resume/list/delete sessions
  *
- * EVERY production code path that talks to the SDK MUST go through `SdkAdapter`.
- * No direct `import` of `CopilotClient` outside of `CopilotSdkAdapter.ts`. The
- * project's ESLint config enforces this with a `no-restricted-imports` rule.
+ * Consumers depend ONLY on the interface they need. The harness's `saveHarness`
+ * (which only enumerates sessions) imports `SdkSessionRegistry`, NOT `SdkAdapter`.
+ * The activation code (which needs both lifecycle and registry) imports
+ * `SdkAdapter`, the aggregate.
+ *
+ * This satisfies ISP (Interface Segregation Principle) and SRP (Single
+ * Responsibility Principle): each segregated interface has one reason to change.
+ *
+ * Production: `CopilotSdkAdapter` (wraps `CopilotClient` + `CopilotSession`)
+ *   implements `SdkAdapter` (and therefore both segregated interfaces).
+ * Test:        `FakeSdkAdapter` (in-memory; satisfies the behavioral contract below)
+ *   implements `SdkAdapter`.
+ *
+ * EVERY production code path that talks to the SDK MUST go through one of these
+ * interfaces. No direct `import` of `CopilotClient` outside of
+ * `CopilotSdkAdapter.ts`. The project's ESLint config enforces this with a
+ * `no-restricted-imports` rule.
  */
-export interface SdkAdapter {
+
+/**
+ * Owns the lifecycle of the underlying CopilotClient. Single responsibility:
+ * starting and stopping the SDK process. Knows nothing about sessions.
+ */
+export interface SdkClientLifecycle {
     /**
      * Start the underlying CopilotClient. Idempotent — calling twice is a no-op
      * after the first successful start.
@@ -58,7 +78,13 @@ export interface SdkAdapter {
      * an unstarted adapter.
      */
     stop(): Promise<void>;
+}
 
+/**
+ * Owns session creation, lookup, and deletion. Single responsibility: managing
+ * the catalog of SDK sessions. Knows nothing about client startup/shutdown.
+ */
+export interface SdkSessionRegistry {
     /**
      * Create a new session with our minted session_id (per session-persistence
      * docs R-05 — without an explicit sessionId, the session is non-resumable).
@@ -96,16 +122,48 @@ export interface SdkAdapter {
 }
 
 /**
- * A handle to one active SDK session. Lifecycle: created → idle → resumed →
- * idle → ... → ended (per spec.md Key Entities).
- *
- * `disconnect()` releases in-memory resources but preserves the on-disk session
- * directory for future resume. Use `SdkAdapter.deleteSession(sessionId)` to
- * permanently remove session state.
+ * Aggregate convenience interface for callers (extension activation code) that
+ * legitimately need both lifecycle and registry surfaces. Consumers that only
+ * need ONE of the two MUST import the segregated interface, not this aggregate
+ * (ISP). ESLint enforces this with `no-restricted-imports`.
  */
-export interface SdkSessionHandle {
+export interface SdkAdapter extends SdkClientLifecycle, SdkSessionRegistry {}
+
+/**
+ * SOLID note (pre-emptive ISP segregation): the per-session API is also split
+ * into two single-responsibility interfaces:
+ *
+ *   - `SdkSessionLifecycle` — identity + connection state (sessionId, disconnect)
+ *   - `SdkSessionMessaging` — the messaging plane (send, subscribe, abort turn)
+ *
+ * Consumers that only show session identity in UI (e.g. webview status panes)
+ * import `SdkSessionLifecycle`. Consumers that route prompts and stream events
+ * import `SdkSessionMessaging`. The webview view provider, which needs both,
+ * imports `SdkSessionHandle` (the aggregate).
+ */
+
+/**
+ * Identity + connection state of one SDK session. Single responsibility:
+ * tracking which session this is and whether it's still connected. Knows
+ * nothing about sending or receiving messages.
+ */
+export interface SdkSessionLifecycle {
     readonly sessionId: string;
 
+    /**
+     * Disconnect from this session. In-memory only — on-disk state preserved
+     * for future resume (per CD-02 / R-05). Use
+     * `SdkSessionRegistry.deleteSession(sessionId)` to permanently remove
+     * session state on disk.
+     */
+    disconnect(): Promise<void>;
+}
+
+/**
+ * Messaging plane for one SDK session. Single responsibility: sending prompts
+ * to the agent, subscribing to assistant events, and aborting in-flight turns.
+ */
+export interface SdkSessionMessaging {
     /**
      * Send a prompt to the agent.
      *
@@ -139,12 +197,15 @@ export interface SdkSessionHandle {
      * regardless of which underlying SDK call we use.
      */
     abortCurrentTurn(): Promise<void>;
-
-    /**
-     * Disconnect from this session. In-memory only — on-disk state preserved.
-     */
-    disconnect(): Promise<void>;
 }
+
+/**
+ * Aggregate per-session handle for callers that legitimately need both
+ * lifecycle and messaging. Consumers that only need one MUST import the
+ * segregated interface (ISP). The session goes through these states:
+ *   created → idle → resumed → idle → ... → ended (per spec.md Key Entities).
+ */
+export interface SdkSessionHandle extends SdkSessionLifecycle, SdkSessionMessaging {}
 
 /**
  * Behavioral surface that BOTH the production adapter AND the FakeSdkAdapter

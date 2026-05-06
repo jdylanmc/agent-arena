@@ -280,7 +280,9 @@ The session-side `onPermissionRequest` shim (`extension/src/permission/handler.t
 
 ---
 
-## SdkAdapter (CD-03 fallback / R-02)
+## SdkAdapter — ISP-segregated (CD-03 fallback / R-02)
+
+The SDK seam is split into single-responsibility interfaces per Interface Segregation Principle. Consumers depend only on the segregated interface they need; the aggregates exist for code that legitimately needs both halves.
 
 ```typescript
 import type {
@@ -292,14 +294,14 @@ import type {
   PermissionHandler,
 } from "@github/copilot-sdk";
 
-/** The seam between the extension and the Copilot SDK. The production
- *  implementation (CopilotSdkAdapter) wraps CopilotClient + CopilotSession.
- *  Tests substitute FakeSdkAdapter (which exercises the behaviors enumerated
- *  in CD-03 + R-02). */
-export interface SdkAdapter {
+/** Owns the lifecycle of the underlying CopilotClient. */
+export interface SdkClientLifecycle {
   start(opts: { copilotHome: string; telemetryFilePath: string }): Promise<void>;
   stop(): Promise<void>;
+}
 
+/** Owns session creation, lookup, and deletion. */
+export interface SdkSessionRegistry {
   createSession(opts: SessionConfig & {
     onPermissionRequest: PermissionHandler;
   }): Promise<SdkSessionHandle>;
@@ -312,9 +314,18 @@ export interface SdkAdapter {
   deleteSession(sessionId: string): Promise<void>;
 }
 
-export interface SdkSessionHandle {
-  readonly sessionId: string;
+/** Aggregate; activation code may import this. Consumers that only need one
+ *  half MUST import the segregated interface (ESLint enforced). */
+export interface SdkAdapter extends SdkClientLifecycle, SdkSessionRegistry {}
 
+/** Identity + connection state of one SDK session. */
+export interface SdkSessionLifecycle {
+  readonly sessionId: string;
+  disconnect(): Promise<void>;
+}
+
+/** Messaging plane for one SDK session. */
+export interface SdkSessionMessaging {
   send(opts: MessageOptions & { mode?: "enqueue" }): Promise<void>;
 
   on<E extends SessionEvent | SessionLifecycleEvent>(
@@ -322,10 +333,26 @@ export interface SdkSessionHandle {
     handler: (event: E) => void | Promise<void>
   ): { dispose(): void };
 
-  abortCurrentTurn(): Promise<void>;          // R-11b — verified at implementation
-  disconnect(): Promise<void>;
+  abortCurrentTurn(): Promise<void>;
 }
+
+/** Aggregate per-session handle. Consumers that only need one MUST import
+ *  the segregated interface (ISP). */
+export interface SdkSessionHandle extends SdkSessionLifecycle, SdkSessionMessaging {}
 ```
+
+### Consumer-to-interface mapping (DIP)
+
+| Consumer | Imports |
+|---|---|
+| `extension/src/extension.ts` (activate/deactivate) | `SdkClientLifecycle` |
+| `extension/src/sdk/lifecycle.ts` (supervisor state machine) | `SdkClientLifecycle` |
+| `extension/src/harness/save.ts` | `SdkSessionRegistry` |
+| `extension/src/harness/load.ts` | `SdkSessionRegistry` |
+| `extension/src/activate/registerCommands.ts` (`harness.import` etc) | `SdkSessionRegistry` |
+| `extension/src/webview/ViewProvider.ts` (binds a session to a view) | `SdkAdapter` (legitimately needs both) |
+| `extension/src/webview/messageRouter.ts` (per-turn dispatch) | `SdkSessionMessaging` |
+| `extension/src/permission/handler.ts` (resolves policy per session) | `SdkSessionLifecycle` (only needs `sessionId`) |
 
 The `FakeSdkAdapter` MUST emit, on demand:
 
@@ -337,6 +364,62 @@ The `FakeSdkAdapter` MUST emit, on demand:
 - A startup failure error (for the negative path test).
 - A runtime error event mid-turn (for the negative path test).
 - The `listSessions` / `deleteSession` contract.
+
+---
+
+## WikiRawPointer (FR-029 / Knowledge Base / closes deputy round-1 wiki/raw item)
+
+Every file under `wiki/raw/<source>/` is a **pointer manifest** — a markdown file with YAML frontmatter capturing source provenance. Pointers are **immutable** post-`fetched_at`: the body of a pointer file MUST NOT be edited after it is committed. To re-ingest a source, write a new pointer with a new `fetched_at`.
+
+When cached body content is genuinely needed (e.g. for offline reasoning), it lives **alongside** the pointer at `wiki/raw/<source>/snapshots/<slug>.body.md` and is referenced from the pointer's `body_path` field. Snapshot bodies are also immutable.
+
+```typescript
+/** YAML frontmatter shape for every wiki/raw/<source>/<slug>.pointer.md file. */
+export interface WikiRawPointer {
+  /** Original URL that was fetched. */
+  source_url: string;
+
+  /** ISO-8601 UTC timestamp at which `source_url` was fetched. Immutable. */
+  fetched_at: string;
+
+  /** Git commit SHA (when the source is a git repo). Optional. */
+  commit_sha?: string;
+
+  /** SPDX license identifier of the source content (e.g. "MIT", "Apache-2.0",
+   *  "CC-BY-4.0"). Use "unknown" only when the source explicitly lacks a
+   *  license; in that case `snapshot_kind` MUST be "pointer-only". */
+  license: string;
+
+  /** sha256 of the captured body, if any. Required when snapshot_kind ===
+   *  "cached-body"; absent when snapshot_kind === "pointer-only". */
+  content_hash?: string;
+
+  /** Whether this pointer carries cached content alongside it. */
+  snapshot_kind: "pointer-only" | "cached-body";
+
+  /** Path to the cached body file relative to this pointer file. Required
+   *  when snapshot_kind === "cached-body"; absent otherwise. */
+  body_path?: string;
+
+  /** Free-form ingest status note. Optional. */
+  ingest_status?: string;
+}
+```
+
+### Immutability rule
+
+- A pointer file (and its `body_path` cached body, when present) is **write-once after first commit**. Edits MUST go through a new pointer file.
+- The deputy and SOLID SNAKE both verify this on every run — any commit that modifies an existing `wiki/raw/<source>/<slug>.pointer.md` (other than to add it for the first time) is flagged.
+- A pointer file MAY be DELETED in a follow-up commit if the source is retracted; the deletion event itself is the audit trail.
+
+### Cached-body licensing rule
+
+- `snapshot_kind: "cached-body"` is permitted only when `license` is one of: `MIT`, `Apache-2.0`, `BSD-3-Clause`, `BSD-2-Clause`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC0-1.0`, `Unlicense`, `0BSD`, or any other SPDX identifier explicitly added to the project's allow-list at `.specify/wiki-raw-licenses.json` (created during `/speckit.implement` task T015).
+- For `license: "unknown"` or any non-allow-listed identifier, `snapshot_kind` MUST be `"pointer-only"` — record the URL and let the agent fetch on demand.
+
+### Relationship to constitution.md:571
+
+Constitution line 571 names `wiki/raw/*.md` as "immutable source pointer files... provenance (URL, captured-at date, access method) and ingest status." This shape is a **superset compatible** with that definition: `WikiRawPointer` includes `source_url`, `fetched_at`, and `ingest_status` as required, with the additional fields `license`, `commit_sha`, `content_hash`, `snapshot_kind`, and `body_path` extending the manifest. The deputy's round-1 review accepted this reading as "superset, not redefinition"; this section formalizes the manifest schema in response to the deputy's request that `/speckit.plan` codify it.
 
 ---
 

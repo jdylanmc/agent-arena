@@ -20,6 +20,33 @@ Principle II violation and the deputy will flag them.
 
 ### Changed
 
+- **SOLID/ISP refactor of `contracts/sdk-adapter.ts`** (pre-emptive,
+  in anticipation of SOLID SNAKE review): split the monolithic
+  `SdkAdapter` (6 methods) into two single-responsibility interfaces
+  — `SdkClientLifecycle` (start/stop) and `SdkSessionRegistry`
+  (create/resume/list/delete sessions) — with the original
+  `SdkAdapter` retained as an aggregate (`extends` both) for callers
+  that legitimately need both halves (extension activation code).
+  Likewise split `SdkSessionHandle` into `SdkSessionLifecycle`
+  (sessionId + disconnect) and `SdkSessionMessaging` (send + on +
+  abortCurrentTurn), with `SdkSessionHandle` as the aggregate.
+  Consumers MUST import the narrowest interface that satisfies their
+  needs; the project's ESLint config will enforce this with
+  `no-restricted-imports` during `/speckit.implement`. Mirror update
+  in `data-model.md` plus a consumer-to-interface mapping table.
+  No behavior change; pure interface segregation. — copilot(developer:opus-4.7)
+- **`WikiRawPointer` schema** added to `data-model.md` (closes the
+  deputy round-1 wiki/raw item): per-pointer-file YAML frontmatter
+  with `source_url`, `fetched_at` (immutable), `commit_sha?`,
+  `license` (SPDX), `content_hash?`, `snapshot_kind`
+  (`pointer-only` | `cached-body`), `body_path?`, and
+  `ingest_status?`. Pointer + body files are write-once after first
+  commit; cached-body snapshots gated by an SPDX license allow-list
+  at `.specify/wiki-raw-licenses.json` (created in /speckit.implement).
+  This is a superset-compatible refinement of `constitution.md:571`'s
+  "immutable source pointer files" definition; `plan.md` Project
+  Structure updated to show the `snapshots/` subdirectory under each
+  ingested source. — copilot(developer:opus-4.7)
 - **`/speckit.plan` for `scaffold-application`**: produced
   `specs/20260506-144809-scaffold-application/plan.md`,
   `research.md` (Phase 0 — SDK + tooling research, with 11 numbered

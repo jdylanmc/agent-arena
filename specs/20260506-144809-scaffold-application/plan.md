@@ -85,12 +85,14 @@ agent-arena/                                # repo root (governance + product si
 │   ├── index.md                            # master content catalog (per constitution.md:569-573)
 │   ├── raw/                                # IMMUTABLE source pointer files (per constitution.md:571)
 │   │   ├── copilot-sdk/
-│   │   │   ├── README.pointer.md           # source_url, fetched_at, commit_sha, license, content_hash
+│   │   │   ├── README.pointer.md           # WikiRawPointer manifest (data-model.md)
 │   │   │   ├── opentelemetry.pointer.md
 │   │   │   ├── session-persistence.pointer.md
 │   │   │   ├── streaming-events.pointer.md
 │   │   │   ├── steering-and-queueing.pointer.md
-│   │   │   ├── … (10–20 pointer manifests per FR-029, REWRITTEN per the wiki/raw definition resolution)
+│   │   │   ├── … (10–20 pointer manifests per FR-029, license-allowlist gated for cached bodies)
+│   │   │   └── snapshots/                  # Cached body files (only when license permits)
+│   │   │       └── …                       # body_path targets per pointer
 │   │   └── vscode-extensions-api/
 │   │       ├── extension-anatomy.pointer.md
 │   │       ├── webview-api.pointer.md
@@ -98,6 +100,8 @@ agent-arena/                                # repo root (governance + product si
 │   │       ├── activation-events.pointer.md
 │   │       ├── memento-state-api.pointer.md
 │   │       ├── … (10–20 pointer manifests per FR-029)
+│   │       └── snapshots/                  # Cached body files (only when license permits)
+│   │           └── …
 │   ├── docs/
 │   │   ├── log-schema.md                   # FR-023 — canonical EI-1 envelope catalog
 │   │   ├── harness-schema.md               # FR-024 — AgentArenaHarness JSON shape
@@ -215,7 +219,7 @@ See [research.md](./research.md). Findings R-01 through R-11 cited inline above 
 | Artifact | Path | Purpose |
 |---|---|---|
 | Webview ↔ host envelope spec (CD-04) | [contracts/webview-protocol.md](./contracts/webview-protocol.md) | Versioned envelope shape, message-type enum, Zod schemas, reject-unknown rule, correlation propagation |
-| SDK adapter interface (CD-03 fallback) | [contracts/sdk-adapter.ts](./contracts/sdk-adapter.ts) | The seam the extension imports; `CopilotSdkAdapter` (prod) and `FakeSdkAdapter` (test) implement it |
+| SDK adapter interfaces (CD-03 fallback, ISP-segregated) | [contracts/sdk-adapter.ts](./contracts/sdk-adapter.ts) | Four single-responsibility interfaces (`SdkClientLifecycle`, `SdkSessionRegistry`, `SdkSessionLifecycle`, `SdkSessionMessaging`) + two aggregates (`SdkAdapter`, `SdkSessionHandle`); `CopilotSdkAdapter` (prod) and `FakeSdkAdapter` (test) implement the aggregates. Consumers depend only on the segregated interface they need (ISP, enforced by `no-restricted-imports`). |
 | Permission policy interface (FR-019 / R-06) | [contracts/permission-policy.ts](./contracts/permission-policy.ts) | The typed interface that proves the "future per-tool policy without changing call sites" promise |
 | Data model (CD-02 / R-05) | [data-model.md](./data-model.md) | `AgentArenaHarness`, `Agent`, `HarnessedSession`, `CanonicalEvent`, `MessageEnvelope` types — **including unload semantics per the deputy's round-2 carry-forward (EI-2)** |
 | Manual live-SDK verification ritual (SC-002) | [quickstart.md](./quickstart.md) | DEFERRED to a subsequent commit — defines the timer, evidence, OS/version capture, where the trace excerpt lands in the PR |
