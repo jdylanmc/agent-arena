@@ -3,7 +3,7 @@
 An orchestration engine for managing multiple autonomous agents — delivered
 as a Visual Studio Code extension. Agent Arena turns a single human prompt
 into an attributed, gated, observable collaboration between a designated
-**executor** agent and any number of read-only **advisor** agents, with a
+**developer** agent and any number of read-only **advisor** agents, with a
 dedicated **curator** agent maintaining an internal LLM wiki.
 
 > *"Agents may act autonomously, but execution is controlled, attributed,

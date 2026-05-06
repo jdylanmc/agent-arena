@@ -4,6 +4,11 @@ SYNC IMPACT REPORT
 Version change: (initial) → 1.0.0
 Bump rationale: Initial ratification of the Agent Arena Constitution per issue #1.
 
+Pre-ratification revisions (still v1.0.0, not yet merged):
+  - 2026-05-06: Renamed the mutating-agent role from "executor" → "developer"
+    per maintainer feedback. The principle name "Single Execution Authority"
+    is unchanged (it describes the abstract authority the developer holds).
+
 Modified principles: (none — initial)
 Added sections:
   - Core Principles (I. Single Execution Authority, II. Attributed Identity,
@@ -36,10 +41,11 @@ Follow-up TODOs: (none)
 
 All meaningful changes to the workspace MUST flow through a single, explicitly
 designated execution authority. At any moment exactly one agent — the
-**executor** — is permitted to mutate workspace state (files, source control,
-build artifacts, configuration). Every other agent is a read-only advisor.
+**developer** — is permitted to mutate workspace state (files, source control,
+build artifacts, configuration). The developer is the agent the human is
+directly interacting with. Every other agent is a read-only advisor.
 
-The executor MAY hand authority to a different agent, but the handoff MUST be
+The developer MAY hand authority to a different agent, but the handoff MUST be
 explicit, attributed, and visible in the orchestration timeline. Concurrent
 mutation by two agents is a constitution violation regardless of intent.
 
@@ -52,7 +58,7 @@ human's authority meaningful and conflict resolution tractable.
 Every action, message, comment, commit, pull request body, log entry, and
 artifact produced by an agent MUST carry an agentic identity in the canonical
 format `<provider>(<role>:<model>)` — for example `copilot(security:opus-4.6)`
-or `copilot(executor:gpt-5.4)`. Anonymous agent output is forbidden.
+or `copilot(developer:gpt-5.4)`. Anonymous agent output is forbidden.
 
 Identity MUST be present at the point of authorship. Adding it after the fact
 during review does not satisfy this principle.
@@ -66,7 +72,7 @@ against other agents' input.
 Agent Arena follows strict Test-Driven Development. For every behavior change:
 
 1. A failing test MUST be written first.
-2. The user (or the executor on the user's behalf) MUST acknowledge the test
+2. The user (or the developer on the user's behalf) MUST acknowledge the test
    captures the intended behavior.
 3. The test MUST be observed to fail (Red).
 4. Implementation makes the test pass with no other meaningful change (Green).
@@ -124,7 +130,7 @@ its underlying logs). The human MUST be able to pause, stop, or redirect any
 agent at any time, and resumption MUST restore prior context.
 
 No background process may directly alter the workspace. Background work is
-permitted, but its proposed mutations MUST be queued for the executor and
+permitted, but its proposed mutations MUST be queued for the developer and
 remain visible to the human until accepted.
 
 Rationale: Autonomy without observability is opacity, and opacity destroys
@@ -142,18 +148,19 @@ operationally enforced by this principle.
   Testing uses **vitest**. Linting uses **ESLint**. Package management uses
   **npm**.
 - The extension MUST follow VS Code's contribution model. Major capabilities
-  (agent registry, executor, advisor sessions, wiki curator, inbox,
+  (agent registry, developer, advisor sessions, wiki curator, inbox,
   orchestration timeline) MUST be registered as discrete services with
   explicit, typed contracts — not wired together through ad-hoc globals.
 - Agents are typed by role. Initial roles are:
-  - **Executor** — the one agent currently authorized to mutate state.
+  - **Developer** — the one agent currently authorized to mutate state, and
+    the agent the human is directly interacting with.
   - **Advisor** — read-only reviewer, scoped to specific surfaces (security,
     tests, design, etc.). Advisors emit attributed recommendations to the
-    executor's inbox; they do not write to the workspace.
+    developer's inbox; they do not write to the workspace.
   - **Curator** — owns the `wiki/` knowledge base. May write only inside
     `wiki/`, and only via the Ingest, Lint, and Query skills.
 - Agents communicate exclusively through typed messages. Attributed inbox
-  entries are the canonical advisor-to-executor channel.
+  entries are the canonical advisor-to-developer channel.
 - Secrets, tokens, and credentials MUST NOT be committed to the repository,
   written to logs, or embedded in agent transcripts. Redaction is the
   responsibility of every component that emits human-readable output.
