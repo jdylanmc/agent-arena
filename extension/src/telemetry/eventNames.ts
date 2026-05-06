@@ -51,6 +51,7 @@ export const EVENT_NAMES = Object.freeze({
     AA_SDK_CLI_START_FAILED: "aa.sdk.cli.start_failed.v1",
     AA_SDK_CLI_DEGRADED: "aa.sdk.cli.degraded.v1",
     AA_SDK_CLI_RESTART_ATTEMPTED: "aa.sdk.cli.restart_attempted.v1",
+    AA_SDK_ADAPTER_SELECTED: "aa.sdk.adapter.selected.v1",
 
     AA_EVENT_HANDLER_FAILED: "aa.event_handler.failed.v1",
 

@@ -2,10 +2,17 @@
 //
 // The extension host runs in Node.js inside the VS Code extension host process.
 // We bundle the TypeScript source under src/ into a single CJS file at
-// dist/extension.js with `vscode` left as an external (resolved at runtime by
+// dist/extension.cjs with `vscode` left as an external (resolved at runtime by
 // the host).
 //
 // The webview UI is bundled separately by Vite (see vite.config.ts).
+//
+// `@github/copilot-sdk` and its bundled CLI (`@github/copilot`) MUST be left
+// external. The SDK locates the CLI at runtime via `require.resolve()` and
+// spawns it as a child process; bundling them would break that resolution
+// and the extension would fail to talk to the real Copilot model. The
+// packaged extension ships with `node_modules/@github/copilot{,-sdk}` in
+// place, which the CJS runtime resolves via the standard Node algorithm.
 
 import * as esbuild from "esbuild";
 import process from "node:process";
@@ -21,7 +28,7 @@ const config = {
   format: "cjs",
   platform: "node",
   target: "node20",
-  external: ["vscode"],
+  external: ["vscode", "@github/copilot-sdk", "@github/copilot"],
   sourcemap: production ? false : "linked",
   minify: production,
   treeShaking: true,

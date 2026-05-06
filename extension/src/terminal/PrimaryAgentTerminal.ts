@@ -55,6 +55,10 @@ export interface PrimaryAgentTerminalOptions {
      *  state at open time and on each /yolo command. Returns the new state. */
     getYolo: () => boolean;
     setYolo: (next: boolean) => void;
+    /** Optional subtitle shown after `· Primary Agent ·` in the banner.
+     *  Used to advertise the active SDK adapter (e.g. "connected to GitHub
+     *  Copilot as alice (user)" or "demo mode (not signed in)"). */
+    bannerSubtitle?: string;
 }
 
 export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
@@ -68,6 +72,7 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
     private readonly agentId: string;
     private readonly getYolo: () => boolean;
     private readonly setYolo: (next: boolean) => void;
+    private readonly bannerSubtitle: string;
 
     private inputBuffer = "";
     private session: SdkSessionHandle | undefined;
@@ -81,6 +86,7 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
         this.agentId = opts.agentId ?? "primary";
         this.getYolo = opts.getYolo;
         this.setYolo = opts.setYolo;
+        this.bannerSubtitle = opts.bannerSubtitle ?? "demo mode";
     }
 
     open(_initialDimensions: vscode.TerminalDimensions | undefined): void {
@@ -146,7 +152,7 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
     private writeBanner(): void {
         const yoloLabel = this.getYolo() ? `${ANSI.red}YOLO ON${ANSI.reset}` : `${ANSI.green}yolo OFF${ANSI.reset}`;
         this.write(
-            `${ANSI.bold}Agent Arena${ANSI.reset} ${ANSI.dim}· Primary Agent · demo mode · ${ANSI.reset}${yoloLabel}${CRLF}` +
+            `${ANSI.bold}Agent Arena${ANSI.reset} ${ANSI.dim}· Primary Agent · ${this.bannerSubtitle} · ${ANSI.reset}${yoloLabel}${CRLF}` +
                 `${ANSI.dim}Type a prompt and press Enter. /help for slash commands. Ctrl+C to abort, Ctrl+L to clear.${ANSI.reset}${CRLF}` +
                 CRLF,
         );

@@ -18,6 +18,31 @@ Principle II violation and the deputy will flag them.
 
 ## [Unreleased]
 
+### Added
+
+- **Production `CopilotSdkAdapter` + runtime selector** (T035):
+  `extension/src/sdk/CopilotSdkAdapter.ts` is now the SOLE permitted
+  importer of `@github/copilot-sdk` runtime values; it implements the
+  ISP-segregated `SdkAdapter` contract by wrapping `CopilotClient` and
+  `CopilotSession`. A new `extension/src/sdk/selectAdapter.ts` decides
+  at runtime whether to use the real adapter (user signed in to GitHub
+  Copilot) or fall back to `FakeSdkAdapter` demo mode (not signed in,
+  CLI failed to start, or `forceFake` for tests). Adapter selection is
+  lazy — happens on first invocation of `agent-arena.openPrimaryAgent`,
+  not on extension activation, so the Copilot CLI is not spawned on
+  every VS Code startup. The chosen adapter is announced via a new
+  `aa.sdk.adapter.selected.v1` canonical event and surfaced in the
+  Pseudoterminal banner subtitle (e.g. "connected to GitHub Copilot as
+  alice (user)" or "demo mode (not signed in)"). `@github/copilot-sdk`
+  and `@github/copilot` are esbuild externals so the SDK locates the
+  bundled CLI at runtime via `require.resolve()`. Note: SDK v0.1.8
+  doesn't expose `copilotHome` or `telemetry` on `CopilotClientOptions`
+  — `COPILOT_HOME` is redirected via env, and SDK-internal telemetry
+  routing is deferred until the SDK adds it (the canonical EI-1 log
+  still captures the events that matter per CD-01 normalization).
+  Adapter NOT exercised by unit tests per FR-033 (live SDK); interface
+  conformance is type-checked. — copilot(developer:opus-4.7)
+
 ### Changed
 
 - **`/speckit.tasks` for `scaffold-application`**: produced
