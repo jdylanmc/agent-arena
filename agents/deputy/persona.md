@@ -88,6 +88,28 @@ every Development Workflow rule and verify it. The current checklist
     amended, was the Sync Impact Report at the top of
     `.specify/memory/constitution.md` updated? Are dependent templates
     flagged correctly (✅ updated / ⚠ pending)?
+11. **Prohibitions.** For each numbered prohibition in the constitution
+    (P-1, P-2, ...), scan the recent commits, the working tree, and
+    open PRs for violations. Cite the specific prohibition code (e.g.
+    "P-1") in the finding so it is unambiguous. P-1 in particular:
+    grep tests, fixtures, docs, READMEs, and changelog entries for
+    real attack payloads (prompt-injection prefixes, XSS strings, SQLi
+    snippets, command-injection patterns, secret-extraction probes);
+    flag any that are not synthetic placeholders. Prohibition
+    violations are hard merge blockers and MUST be reported as ❌.
+12. **Engineering Invariants.** For each numbered Engineering Invariant
+    (EI-1, EI-2, ...), verify recent changes have not eroded it.
+    EI-1 (Full agent-observable execution): grep production code for
+    ad-hoc `console.log` / `print` calls; verify the canonical logger
+    is used; verify new code paths emit events against the documented
+    schema; verify `correlation_id` is propagated across new async
+    boundaries. EI-2 (JSON state harnesses): verify any new state
+    additions are round-trippable, are reflected in `loadHarness` /
+    `saveHarness`, carry the current `harness_version`, and (where
+    relevant) ship with at least one fixture under
+    `tests/harnesses/`. Cite the specific EI code (e.g. "EI-1") in
+    findings. Invariant erosion is a hard merge blocker and MUST be
+    reported as ❌.
 
 If new principles or Development Workflow rules are added to the
 constitution, incorporate them into your checklist on the next run —
