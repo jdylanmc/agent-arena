@@ -20,6 +20,22 @@ Principle II violation and the deputy will flag them.
 
 ### Changed
 
+- **`/speckit.tasks` for `scaffold-application`**: produced
+  `specs/20260506-144809-scaffold-application/tasks.md` with 91
+  numbered tasks (T001..T091) grouped by user story (US1 P1
+  round-trip MVP, US2 P2 yolo + permissions) and infrastructure
+  phases (Setup, Foundational, Polish). Tests are MANDATORY (not
+  "OPTIONAL" as the template suggests) per constitution Principle III
+  (Test-First, NON-NEGOTIABLE) — every implementation task is
+  preceded by a failing-test task that exercises the same behavior.
+  US1 is shippable as MVP after Phase 3 lands. Polish phase covers
+  the harness round-trip + unload tests (binding EI-2 per plan.md
+  gate), trace-log rotation (closes reviewer significant finding
+  #12), live-SDK auth verification (R-11c, tagged `@live-sdk` and
+  excluded from CI per FR-033), spec hygiene cleanups (closes deputy
+  round-1 minor items: P-1/EI mislabel at spec.md:18-19, Key
+  Entities `events.jsonl` drift, README "numbered branch" drift,
+  edge-case coverage), and final wiki cross-linking. — copilot(developer:opus-4.7)
 - **SOLID/ISP refactor of `contracts/sdk-adapter.ts`** (pre-emptive,
   in anticipation of SOLID SNAKE review): split the monolithic
   `SdkAdapter` (6 methods) into two single-responsibility interfaces
