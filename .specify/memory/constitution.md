@@ -58,6 +58,15 @@ Pre-ratification revisions (still v1.0.0, not yet merged):
     re-assert their primary assumptions and goals over time. The
     branch-naming strategy itself remains a Spec Kit configuration
     concern, not a constitutional rule.
+  - 2026-05-06: Made changelog-entry attribution explicit. Principle II
+    now lists "changelog entry" alongside commits, PR bodies, comments,
+    and log entries, and defines the canonical inline trailer form
+    (`— <provider>(<role>:<model>)`). The Changelog discipline bullet
+    under Development Workflow grew an "Attribution per entry" sub-bullet
+    requiring the trailer on every entry, with the deputy responsible
+    for catching unattributed entries during review. Existing
+    `[Unreleased]` entries in `CHANGELOG.md` were back-attributed to the
+    developer agent that wrote them.
 
 Modified principles: (none renamed; bodies of I, V, VI revised)
 Added sections:
@@ -81,7 +90,8 @@ Templates requiring updates:
   - ✅ README.md — updated to disambiguate product runtime (parallel agents)
     from dev-time discipline (single developer per working tree)
   - ✅ CHANGELOG.md — created at repo root with `[Unreleased]` section
-    capturing pre-1.0 work, per Keep a Changelog 1.1.0
+    capturing pre-1.0 work, per Keep a Changelog 1.1.0; existing entries
+    back-attributed with Principle II inline-trailer identities
   - ✅ agents/deputy/persona.md — source-controlled deputy persona
   - ✅ agents/deputy/reports/ — directory for deputy reports (with .gitkeep)
   - ✅ agents/README.md — top-level explainer for source-controlled agents
@@ -169,13 +179,21 @@ parallel cloud agents on independent pull-request checkouts.
 
 ### II. Attributed Identity
 
-Every action, message, comment, commit, pull request body, log entry, and
-artifact produced by an agent MUST carry an agentic identity in the canonical
-format `<provider>(<role>:<model>)` — for example `copilot(security:opus-4.6)`
-or `copilot(developer:gpt-5.4)`. Anonymous agent output is forbidden.
+Every action, message, comment, commit, pull request body, log entry,
+changelog entry, and artifact produced by an agent MUST carry an agentic
+identity in the canonical format `<provider>(<role>:<model>)` — for example
+`copilot(security:opus-4.6)` or `copilot(developer:gpt-5.4)`. Anonymous
+agent output is forbidden.
 
 Identity MUST be present at the point of authorship. Adding it after the fact
 during review does not satisfy this principle.
+
+The canonical inline form, used wherever the identity rides alongside the
+content it authored (changelog bullets, inbox entries, deputy report
+findings, agent-authored comments), is an em-dash followed by the identity
+in parentheses-free form, e.g. `— copilot(developer:opus-4.7-xhigh)`. When
+a single artifact has multiple agent authors they MUST all be listed,
+comma-separated.
 
 Rationale: Origin is the foundation of trust, accountability, and replay. An
 unattributed action cannot be audited, reverted with confidence, or weighted
@@ -324,6 +342,16 @@ defined in the relevant feature spec, not here.
     user-visible change MUST add an entry under `[Unreleased]` in the
     appropriate group: `Added`, `Changed`, `Deprecated`, `Removed`,
     `Fixed`, or `Security`.
+  - **Attribution per entry (Principle II).** Every changelog bullet
+    MUST end with an agentic identity trailer in the canonical
+    Principle II inline form — an em-dash followed by
+    `<provider>(<role>:<model>)`, e.g.
+    `— copilot(developer:opus-4.7-xhigh)`. Bullets authored by multiple
+    agents list each identity, comma-separated. Bullets authored by a
+    human carry the human's name in the same trailer position
+    (e.g. `— @jdylanmc`). Anonymous changelog entries are a Principle II
+    violation and MUST be rejected at PR review by the developer or by
+    the deputy.
   - **One entry per version, latest first.** Releases promote the
     `[Unreleased]` section to a new dated, versioned section at the top
     of the file; older versions stay in place.

@@ -75,7 +75,12 @@ every Development Workflow rule and verify it. The current checklist
    verification)?
 8. **Changelog discipline.** Did user-visible PRs add entries under
    `[Unreleased]` in `CHANGELOG.md` per Keep a Changelog 1.1.0?
-   Are deprecations announced before removals?
+   Does **every** changelog bullet end with the canonical Principle II
+   inline-trailer attribution
+   (`— <provider>(<role>:<model>)`, or `— @<github-handle>` for
+   human-authored entries)? Bullets without a trailer are a Principle II
+   violation and MUST be flagged ❌. Are deprecations announced before
+   removals?
 9. **Secrets discipline.** Do any commits, logs, transcripts, comments,
    or wiki pages appear to contain secret-shaped strings (tokens, keys,
    credentials)?
