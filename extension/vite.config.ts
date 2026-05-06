@@ -34,9 +34,10 @@ function syncProtocolDirPlugin() {
             copyFileSync(srcPath, dstPath);
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         // src/protocol may not exist yet during early scaffolding; tolerate.
-        if (err && err.code !== "ENOENT") throw err;
+        const code = (err as { code?: string } | null)?.code;
+        if (code !== "ENOENT") throw err;
       }
     },
   };

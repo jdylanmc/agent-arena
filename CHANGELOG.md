@@ -140,6 +140,42 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **`/speckit.implement` Phase 2 (foundational types) — first wave**
+  (`tasks.md` T022-T025, T037, T044-T045, T047-T048 ticked).
+  Landed pure-TypeScript foundational modules + their failing-first
+  vitest unit tests:
+    - `extension/src/protocol/envelope.ts` — `MessageEnvelopeSchema`
+      (Zod) for the CD-04 webview ↔ host postMessage envelope plus
+      `validateEnvelope` with a typed rejection-reason taxonomy.
+    - `extension/src/protocol/types.ts` — per-`type` Zod schemas
+      (`webview.ready`, `prompt.submit`, `yolo.set`,
+      `permission.respond`, `assistant.delta`,
+      `assistant.message.final`, `permission.prompt`,
+      `session.state`, `error`) with a `MESSAGE_SCHEMAS` dispatch
+      table type-checked against the `MessageType` union.
+    - `extension/src/telemetry/event.ts` — `CanonicalEvent<T>` shape
+      + `CanonicalEventSchema` (Zod) per CD-01/EI-1 (`ts`, `level`,
+      `event` namespaced+versioned, `agent_id`, `correlation_id`,
+      `payload`) plus `makeEvent` helper and `EVENT_NAME_PATTERN`
+      regex.
+    - `extension/src/telemetry/eventNames.ts` — frozen catalog of
+      every initial event identifier (15 `aa.*` + 9 `copilot.*`)
+      with `isCatalogedEventName` runtime guard.
+    - `extension/src/harness/shape.ts` — `AgentArenaHarness`,
+      `Agent`, `HarnessedSession`, `ManifestFile` types, frozen
+      `EMPTY_HARNESS` constant (binds plan.md unload semantics),
+      and `serializeHarness` deterministic serializer (sorts agents
+      by id, sessions by session_id, manifest.files by name; 2-space
+      indent; trailing newline) per EI-2 "Diffable" clause.
+    - `extension/src/permission/PermissionPolicy.ts` —
+      `PermissionDecision`, `PermissionDecisionContext`,
+      `PermissionPolicy`, `PolicyResolver` typed interfaces (the
+      seam FR-019 promised, designed for future per-tool policies).
+  Test files under `extension/test/unit/{protocol,telemetry,harness}/`
+  exercise envelope validation, dispatch coverage, event-name pattern
+  conformance, harness round-trip determinism, and the empty-harness
+  unload constant. Implementations were authored AFTER their tests
+  per Principle III. — copilot(developer:opus-4.7)
 - **`/speckit.implement` Phase 1 — `extension/` scaffolding**
   (`tasks.md` T001–T010 ticked). Created the `extension/` package
   with `publisher: jdylanmc`, `name: agent-arena`, `version: 0.0.1`,

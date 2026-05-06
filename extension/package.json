@@ -12,6 +12,7 @@
     "url": "https://github.com/jdylanmc/agent-arena.git",
     "directory": "extension"
   },
+  "type": "module",
   "engines": {
     "vscode": "^1.95.0",
     "node": ">=20.0.0"
@@ -82,8 +83,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vscode-test",
-    "lint": "eslint \"src/**/*.ts\" \"webview-src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
-    "lint:fix": "eslint --fix \"src/**/*.ts\" \"webview-src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern node_modules",
+    "lint:fix": "eslint . --fix --ignore-pattern dist --ignore-pattern node_modules",
     "format": "prettier --write \"src/**/*.ts\" \"webview-src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"webview-src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.webview.json",
