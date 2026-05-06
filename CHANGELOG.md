@@ -140,6 +140,55 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **`/speckit.implement` Phase 2 wave 3 + Phase 3 first slice — visible
+  end-to-end demo** (`tasks.md` T046, T054-T056, T058-T064 ticked;
+  running total: 34 of 91 tasks). The extension is now **F5-runnable**
+  end-to-end: press F5 in `extension/`, click the Activity Bar icon,
+  submit a prompt, see streamed assistant responses. The user-visible
+  surface is real React + Tailwind, the postMessage envelope is real
+  CD-04, and every event hits the canonical EI-1 log:
+    - Moved `FakeSdkAdapter` from `test/unit/sdk/` to `src/sdk/` and
+      taught it an `autoRespond` mode for demo use. The Fake is the
+      production adapter until task T035 lands the real
+      `CopilotSdkAdapter`.
+    - `extension/src/webview/messageRouter.ts` — host-side dispatcher
+      validating every inbound envelope via Zod, rejecting unknown
+      `type` and payload-schema violations as `aa.webview.message.rejected.v1`,
+      catching handler errors as `aa.event_handler.failed.v1`.
+    - `extension/src/webview/ViewProvider.ts` — `WebviewViewProvider`
+      wiring the React bundle into the Activity Bar view. Constructs
+      the webview HTML with CSP nonce; brokers postMessage in both
+      directions; manages the per-view session lifecycle; subscribes
+      to SDK events and translates to outbound envelopes
+      (`assistant.delta`, `assistant.message.final`, `session.state`,
+      `error`).
+    - `extension/src/extension.ts` — entry point. Constructs
+      `EventEmitter` (writes `${context.logUri}/agent-arena.events.jsonl`),
+      starts the FakeSdkAdapter in demo mode with auto-respond,
+      registers `PrimaryAgentViewProvider` + commands.
+    - `extension/src/activate/registerCommands.ts` —
+      `agent-arena.openPrimaryAgent`, `agent-arena.showTraceLog`,
+      `agent-arena.harness.{export,import}` (the harness commands are
+      stubbed; full impl lands T078).
+    - `extension/src/shared/ids.ts` — `mintSessionId(agentId)`,
+      `mintCorrelationId()`, `mintMessageId()`.
+    - `extension/webview-src/` — React + Tailwind UI:
+      `App.tsx` (state machine for status / turns / errors),
+      `components/StatusHeader.tsx`, `components/MessageList.tsx`
+      (with streaming caret + finalized indicator),
+      `components/PromptInput.tsx` (Enter to send, Shift+Enter newline),
+      `protocol/messageBus.ts` (typed `bus.send` / `bus.on` over
+      `acquireVsCodeApi`), `styles/tailwind.css` (VS Code theme
+      variables baked in via `tailwind.config.ts`).
+    - `extension/.vscode/launch.json` + `tasks.json` — F5 launches an
+      Extension Development Host with the bundle pre-built.
+    - `extension/README.md` — install + build + F5 instructions, plus
+      the manual SC-002 verification ritual that takes effect once
+      T035 lands.
+  All 91 vitest unit tests still green; typecheck clean; lint clean;
+  `npm run build` produces `dist/extension.js` (~573KB) and
+  `dist/webview/{index.html, assets/index.{js,css}}` (~226KB total).
+  — copilot(developer:opus-4.7)
 - **`/speckit.implement` Phase 2 (foundational types) — second wave**
   (`tasks.md` T028–T034 ticked; running total: 24 of 91 tasks).
   Landed the SDK adapter seam, supervisor state machine, and EI-1

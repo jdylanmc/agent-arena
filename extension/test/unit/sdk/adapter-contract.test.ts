@@ -27,7 +27,7 @@ type FakeSessionApi = {
 };
 
 import { describe, it, expect } from "vitest";
-import { FakeSdkAdapter, type FakeSessionEvent } from "./FakeSdkAdapter.js";
+import { FakeSdkAdapter, type FakeSessionEvent } from "../../../src/sdk/FakeSdkAdapter.js";
 import {
     REQUIRED_BEHAVIORAL_CONTRACT,
     type SdkSessionHandle,

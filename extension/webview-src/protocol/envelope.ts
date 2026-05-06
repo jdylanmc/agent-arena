@@ -80,11 +80,18 @@ export function validateEnvelope(raw: unknown): EnvelopeValidationResult {
     }
     // Distinguish "wrong protocol version" from generic schema violation, since
     // it has its own remediation (envelope shape changed in a v2 the host
-    // doesn't yet handle).
+    // doesn't yet handle). Only classify as unsupported_protocol_version when
+    // the field is present in the raw input with a non-1 value — a missing
+    // field belongs in the generic envelope_schema_violation bucket.
+    const versionFieldPresent =
+        typeof raw === "object" &&
+        raw !== null &&
+        "protocol_version" in raw &&
+        (raw as { protocol_version: unknown }).protocol_version !== undefined;
     const wrongVersion = parsed.error.issues.find(
         (issue) => issue.path.length === 1 && issue.path[0] === "protocol_version",
     );
-    if (wrongVersion) {
+    if (versionFieldPresent && wrongVersion) {
         return {
             ok: false,
             reason: "unsupported_protocol_version",
