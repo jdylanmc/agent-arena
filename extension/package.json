@@ -21,9 +21,11 @@
   "activationEvents": [
     "onView:agentArenaPrimaryView",
     "onCommand:agent-arena.openPrimaryAgent",
+    "onCommand:agent-arena.toggleYolo",
     "onCommand:agent-arena.showTraceLog",
     "onCommand:agent-arena.harness.export",
-    "onCommand:agent-arena.harness.import"
+    "onCommand:agent-arena.harness.import",
+    "onStartupFinished"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {
@@ -40,15 +42,24 @@
       "agentArena": [
         {
           "id": "agentArenaPrimaryView",
-          "name": "Primary Agent",
-          "type": "webview"
+          "name": "Primary Agent"
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "agentArenaPrimaryView",
+        "contents": "## Agent Arena\n\nThe primary agent runs in a VS Code terminal — no bespoke UI.\n\n[Open Primary Agent Terminal](command:agent-arena.openPrimaryAgent)\n\n_Demo mode is active until the production CopilotSdkAdapter lands in task T035._\n\n[Show trace log](command:agent-arena.showTraceLog)"
+      }
+    ],
     "commands": [
       {
         "command": "agent-arena.openPrimaryAgent",
         "title": "Agent Arena: Open Primary Agent"
+      },
+      {
+        "command": "agent-arena.toggleYolo",
+        "title": "Agent Arena: Toggle Yolo"
       },
       {
         "command": "agent-arena.showTraceLog",

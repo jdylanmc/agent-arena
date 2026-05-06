@@ -92,6 +92,6 @@ export default [
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**", "*.config.*", ".vscode-test.mjs"],
+    ignores: ["dist/**", "node_modules/**", "*.config.*", ".vscode-test.mjs", "scripts/**"],
   },
 ];
