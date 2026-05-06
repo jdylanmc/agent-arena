@@ -87,7 +87,7 @@ The primary agent honors the SDK's required `onPermissionRequest` handler. By de
 - **FR-006**: The extension MUST register a `views` entry of type `webview` inside the Agent Arena view container, hosting the **primary agent terminal** view.
 - **FR-007**: The extension MUST register a command `agent-arena.openPrimaryAgent` that focuses (and reveals if hidden) the primary agent terminal view.
 - **FR-008**: The extension MUST declare modern command-based activation (no broad `onStartupFinished` activation) so it stays out of the way until the user invokes it.
-- **FR-009**: The webview MUST communicate with the extension host via `postMessage` and `acquireVsCodeApi()`; the extension host MUST be the sole owner of the Copilot SDK client (the webview never imports `@github/copilot-sdk`).
+- **FR-009**: The webview MUST communicate with the extension host via `postMessage` and `acquireVsCodeApi()` using the versioned envelope defined in **CD-04** (`{ protocol_version, message_id, correlation_id, session_id?, agent_id?, type, payload }`, runtime-validated on both sides, unknown `type` rejected and logged); the extension host MUST be the sole owner of the Copilot SDK client (the webview never imports `@github/copilot-sdk`). The `type` enumeration is owned by the extension host and documented at `wiki/docs/webview-protocol.md`.
 
 #### Copilot SDK integration (the core round-trip)
 
@@ -101,20 +101,20 @@ The primary agent honors the SDK's required `onPermissionRequest` handler. By de
 #### Permission handling and yolo toggle
 
 - **FR-016**: The extension MUST register an `onPermissionRequest` handler on every session. When the agent's `yoloMode` is OFF, the handler MUST display the request to the user and only resolve `allow` on explicit user acceptance.
-- **FR-017**: Each agent (in the scaffold, only the primary agent exists) MUST have a `yoloMode` boolean state, default OFF, persisted via VS Code's extension state.
+- **FR-017**: Each agent (in the scaffold, only the primary agent exists) MUST have a `yoloMode` boolean state, default OFF, persisted per **CD-05** in VS Code's `workspaceState` under the key `agentArena.yoloMode.<agentId>`, with Settings Sync explicitly disabled for these keys.
 - **FR-018**: The terminal webview MUST render a yolo toggle in its header using a "robot dabbing" icon (placeholder SVG asset acceptable for the scaffold). The toggle MUST update the agent's `yoloMode` state immediately and the change MUST take effect on the next tool invocation without restarting the session.
 - **FR-019**: The permission handler MUST be implemented in such a way that a future spec can replace the binary yolo/prompt logic with a fine-grained per-tool policy without changing the handler's call sites.
 
 #### Observability — EI-1 binding
 
-- **FR-020**: The extension MUST configure the SDK's built-in OpenTelemetry telemetry (`TelemetryConfig` with `exporterType: "file"`) to write JSON-line traces to a path under `context.logUri`.
-- **FR-021**: The extension MUST emit its own structured events to the same JSONL log for events the SDK does not cover, including at minimum: `extension.activate`, `extension.deactivate`, `webview.opened`, `webview.message_received`, `permission.prompted`, `permission.resolved`, `yolo.toggled`. Event names are stable identifiers; payloads include `timestamp`, `sessionId` (when applicable), and a typed payload.
+- **FR-020**: The extension MUST capture the SDK's OpenTelemetry telemetry and route it through the extension's telemetry adapter (per **CD-01**) into a single canonical JSONL log at `${context.logUri}/agent-arena.events.jsonl`. SDK event identifiers are adopted verbatim as the basis of the canonical `event` field with the `.v1` suffix appended; the original SDK payload is preserved verbatim under `payload.sdk`.
+- **FR-021**: The extension MUST emit its own structured events to the same canonical log for events the SDK does not cover (per **CD-01**). New extension-only event identifiers use the `aa.` namespace and the `.v1` version suffix, including at minimum: `aa.extension.activate.v1`, `aa.extension.deactivate.v1`, `aa.webview.opened.v1`, `aa.webview.message.received.v1`, `aa.webview.message.rejected.v1`, `aa.permission.prompted.v1`, `aa.permission.resolved.v1`, `aa.yolo.toggled.v1`, `aa.harness.session.unrecoverable.v1`. Each event's envelope conforms to the canonical EI-1 schema (`ts`, `level`, `event`, `agent_id` (when attributable), `correlation_id`, and a typed `payload`).
 - **FR-022**: The trace log path MUST be discoverable from the Command Palette via a command `agent-arena.showTraceLog` that opens the file in an editor.
 - **FR-023**: The event-name catalog and payload schemas MUST be documented in `wiki/docs/log-schema.md` and that page MUST be linked from `wiki/index.md`.
 
 #### Harness — EI-2 binding (skeleton only)
 
-- **FR-024**: The extension MUST define an `AgentArenaHarness` JSON shape with a `harness_version`, `agents[]` (each with `id`, `kind`, `yoloMode`), and `activeSessionId` (or null). The schema MUST live in source as a TypeScript type and be documented at `wiki/docs/harness-schema.md`.
+- **FR-024**: The extension MUST define an `AgentArenaHarness` JSON shape with `harness_version`, `agents[]` (each with `id`, `kind` (enumeration; the only valid value in the scaffold is `"primary"`), `yoloMode`), `activeSessionId` (or null), and `sessions[]` (per **CD-02**: each entry `{ session_id, agent_id, session_dir_path, content_hash, manifest: { files: [{ name, size, sha256 }] } }`). The schema MUST live in source as a TypeScript type and be documented at `wiki/docs/harness-schema.md`.
 - **FR-025**: The extension MUST expose two commands `agent-arena.harness.export` and `agent-arena.harness.import` that round-trip the harness JSON to/from a file the user picks, restoring agent settings (yolo state) on import. Session message history is **not** part of the harness in the scaffold (the SDK's own session persistence covers that).
 - **FR-026**: An empty harness fixture file MUST be checked into the repo at `extension/tests/fixtures/harness.empty.json` and used by at least one unit test that exercises import/export.
 
@@ -129,7 +129,7 @@ The primary agent honors the SDK's required `onPermissionRequest` handler. By de
 #### Continuous integration
 
 - **FR-032**: CI MUST run on `ubuntu-latest` and `windows-latest` (macOS deferred to a follow-up). Each job MUST install dependencies, lint (ESLint), type-check, run unit tests (vitest), run integration tests (`@vscode/test-electron`) where feasible, and produce the `.vsix` as a build artifact.
-- **FR-033**: CI MUST NOT exercise the live Copilot SDK (no Copilot subscription token in CI). Unit and integration tests MUST mock `CopilotClient` and `Session`. Live-SDK verification is a documented manual step in the README.
+- **FR-033**: CI MUST NOT exercise the live Copilot SDK (no Copilot subscription token in CI). Unit and integration tests MUST exercise the SDK behind the test seam defined in **CD-03** — the SDK's own test harness if it ships one (verified during `/speckit.plan` via the `@github/copilot-sdk` wiki ingestion), otherwise an `SdkAdapter` interface with a `FakeSdkAdapter` substitute. The seam MUST demonstrably exercise streaming deltas, permission allow/deny, queued prompts, session resume/list, SDK startup failure, and SDK runtime error events. Live-SDK verification is a documented manual step in the README.
 - **FR-034**: CI MUST fail the build on lint errors, type errors, test failures, or `vsce package` failures.
 
 #### Documentation and project hygiene
@@ -214,6 +214,31 @@ first.
 > *Question:* …
 > *Decision:* …
 > *Binds:* FR-xxx, SC-xxx, US-x scenario y
+
+**CD-05 — Yolo toggle persistence scope** (chunk #1, 2026-05-06)
+*Question:* FR-017 says yolo state is "persisted via VS Code's extension state" but does not specify scope. Workspace, window, user, settings-synced?
+*Decision:* **Per-workspace, per-agent, NOT synced across machines.** Yolo state is stored in VS Code's `workspaceState` (`Memento`) under a per-agent key `agentArena.yoloMode.<agentId>`. Settings Sync MUST be explicitly disabled for these keys. Default is OFF on every fresh workspace open; if state was ON in the prior session, the webview MUST render a one-time banner indicating yolo was restored to ON before the user submits the next prompt. Multi-window with the same workspace open shares state via VS Code's `workspaceState` semantics.
+*Binds:* FR-017, FR-018, US-2 acceptance scenarios 3, 4, 5.
+
+**CD-04 — Webview ↔ extension-host protocol envelope** (chunk #1, 2026-05-06)
+*Question:* FR-009 specifies the transport (`postMessage` + `acquireVsCodeApi`) but not the protocol envelope. Two engineers would build incompatibly.
+*Decision:* **Versioned envelope.** Every message in either direction MUST conform to `{ protocol_version: 1, message_id: uuid (v4), correlation_id: uuid (v4), session_id?: string, agent_id?: string, type: string, payload: object }`. Both sides MUST validate the envelope at runtime (using `zod` or an equivalent runtime schema). Unknown `type` values MUST be rejected and an `aa.webview.message.rejected.v1` event emitted (per CD-01). The `correlation_id` MUST be propagated into every EI-1 event emitted as a downstream consequence of the message. The `type` enumeration is owned by the extension host and documented at `wiki/docs/webview-protocol.md`.
+*Binds:* FR-009, FR-021.
+
+**CD-03 — CI test seam for the SDK** (chunk #1, 2026-05-06)
+*Question:* FR-033 mandates that CI mock `CopilotClient` and `Session` but doesn't specify how. Risk of vacuous green CI.
+*Decision:* **SDK-test-harness-first, fall back to adapter + fake.** `/speckit.plan` MUST first ingest `@github/copilot-sdk` (per FR-027) to determine whether the SDK ships a test harness, mock, or fixtures package. If yes: adopt them as the test seam. If no: introduce an `SdkAdapter` interface that the extension host always imports; `CopilotClient` lives only behind the adapter; tests substitute a `FakeSdkAdapter`. Either way, the test seam MUST demonstrably exercise: streaming deltas (`assistant.message_delta`), permission request allow + deny paths, prompt queueing under `mode: "enqueue"`, session resume / list, SDK startup failure, and SDK runtime error events. The chosen approach and the demonstrated behavioral surface MUST be recorded in `plan.md` before `tasks.md` is generated.
+*Binds:* FR-033, SC-001 (CI green budget). Constrains the test seam for FR-010, FR-012, FR-014, FR-015, FR-016.
+
+**CD-02 — EI-2 harness scope: include SDK session state by reference** (chunk #1, 2026-05-06)
+*Question:* FR-024 excludes session message history from the harness "because the SDK persists it." Per EI-2 (`constitution.md:524-552`, "round-trippable"), that's a state leak.
+*Decision:* **Reference-by-manifest.** The `AgentArenaHarness` shape grows a top-level `sessions[]` field. Each entry is `{ session_id: string, agent_id: string, session_dir_path: string (relative to copilotHome), content_hash: string (sha256 of the canonical concatenation of session files), manifest: { files: [{ name, size, sha256 }] } }`. `saveHarness` MUST snapshot the manifest and compute the content hash at save time. `loadHarness` MUST validate the path exists and that each file's sha256 matches the manifest entry; if validation fails, the session entry MUST be marked `state: "unrecoverable"` in the loaded harness and an `aa.harness.session.unrecoverable.v1` event MUST be emitted (per CD-01). The SDK remains the system of record for session content; the harness is the source of truth for which sessions belong to a saved scenario.
+*Binds:* FR-024, FR-025, FR-026, SC-006. Resolves the EI-2 contradiction noted in the PR #5 conformance posture.
+
+**CD-01 — EI-1 telemetry: snap to SDK names, single canonical log** (chunk #1, 2026-05-06)
+*Question:* The constitution mandates a single canonical envelope (`ts` / `level` / `event` namespaced+versioned / `agent_id` / `correlation_id` / `payload`). The Copilot SDK ships its own OpenTelemetry stream with its own shape. How should these reconcile?
+*Decision:* **Single canonical log; SDK-name-first; envelope normalization at the adapter.** All events — both SDK-originated and extension-originated — emit to one canonical JSONL file at `${context.logUri}/agent-arena.events.jsonl` and conform to the canonical envelope mandated by EI-1 (`ts`, `level`, `event`, `agent_id`, `correlation_id`, `payload`). Event identifiers (`event` field) snap to the SDK's existing names verbatim where the SDK already names the event (e.g. an SDK `session.created` becomes `event: "copilot.session.created.v1"`); the `.v1` suffix is appended to honor EI-1's "MUST be namespaced and versioned" requirement and signals the extension's stability commitment to that identifier — if the SDK changes an event name in v2, the extension catalog adds a `.v2` entry alongside with deprecation discipline per Keep a Changelog. New extension-only events that have no SDK counterpart use the `aa.` namespace (e.g. `aa.yolo.toggled.v1`, `aa.webview.opened.v1`, `aa.permission.prompted.v1`). Where the SDK telemetry payload shape differs from `payload`, the extension's telemetry adapter normalizes it into the canonical envelope on emission and preserves the original SDK payload verbatim under `payload.sdk`.
+*Binds:* FR-020, FR-021, FR-022, FR-023, SC-003. Resolves the EI-1 contradiction noted in the PR #5 conformance posture.
 
 <!-- Decisions will be appended above this line as the spec is reviewed. -->
 

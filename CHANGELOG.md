@@ -18,6 +18,29 @@ Principle II violation and the deputy will flag them.
 
 ## [Unreleased]
 
+### Changed
+
+- **`/speckit.clarify` for `scaffold-application`**: encoded five clarifying
+  decisions (CD-01..CD-05, newest-at-top per template) and rewrote
+  FR-009 / FR-017 / FR-020 / FR-021 / FR-024 / FR-033 to match. CD-01 resolves
+  the EI-1 contradiction (single canonical JSONL log; SDK event names adopted
+  verbatim with `.v1` suffix; new extension events under the `aa.` namespace;
+  payload normalized through the telemetry adapter with original SDK payload
+  preserved under `payload.sdk`). CD-02 resolves the EI-2 harness leak
+  (harness gains `sessions[]` with manifest + `content_hash` referencing the
+  SDK session directory; SDK remains system of record). CD-03 sets the CI
+  test seam (use the SDK's own test harness if it ships one — verified during
+  `/speckit.plan` via the wiki ingestion — otherwise an `SdkAdapter` interface
+  with a `FakeSdkAdapter` substitute; either way the seam must exercise
+  streaming, permission allow/deny, queueing, resume, startup failure, and
+  runtime errors). CD-04 specifies the webview ↔ extension-host versioned
+  envelope `{ protocol_version, message_id, correlation_id, session_id?,
+  agent_id?, type, payload }` with runtime validation and unknown-`type`
+  rejection. CD-05 scopes yolo persistence to `workspaceState`, per-agent,
+  with Settings Sync explicitly disabled. The Principle II attribution
+  self-inconsistency and the FR-029 `wiki/raw/` definition contradiction
+  remain to be addressed in subsequent commits to PR #5. — copilot(developer:opus-4.7)
+
 ### Added
 
 - **SOLID SNAKE agent persona** under `agents/solid-snake/` — a
