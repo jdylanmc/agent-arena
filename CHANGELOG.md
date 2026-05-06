@@ -55,6 +55,17 @@ Principle II violation and the deputy will flag them.
   `copilot(solid-snake:<model>)`. Trigger phrase:
   `> Start the SOLID SNAKE agent workflow`. `agents/README.md` updated
   to list him under *Available agents*. — copilot(developer:opus-4.7-xhigh)
+- **`prototype/` directory** with three concept mockups for the
+  long-term Swarm UI vision (out-of-scope for the current scaffold
+  spec, referenced by `specs/20260506-144809-scaffold-application/spec.md`'s
+  *Originating-input citation* section): `swarm-primary.png` (the
+  primary agent workspace), `swarm-background.png` (the background
+  agents grid), and `swarm-workflow.png` (the workflow panel).
+  Filenames are kebab-cased for cross-platform safety. Includes a
+  `prototype/README.md` documenting provenance, scope, and the
+  intended path forward (subsequent specs consume these; durable
+  design notes land under `wiki/docs/` once the wiki tree exists).
+  — copilot(developer:opus-4.7)
 - **First feature spec: `scaffold-application`** (`specs/20260506-144809-scaffold-application/`).
   Establishes the minimal viable foundation for Agent Arena: a VS Code
   extension (publisher `jdylanmc`, MIT license) that integrates the
