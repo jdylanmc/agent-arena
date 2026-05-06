@@ -173,7 +173,8 @@ agent-arena/                                # repo root (governance + product si
 │   │   ├── unit/                           # vitest
 │   │   │   ├── envelope.test.ts            # CD-04 envelope round-trip
 │   │   │   ├── normalizer.test.ts          # SDK-OTel → canonical EI-1 mapping
-│   │   │   ├── harness.roundtrip.test.ts   # FR-026 + CD-02
+│   │   │   ├── harness.roundtrip.test.ts   # FR-026 + CD-02 — uses tests/harnesses/ fixtures
+│   │   │   ├── harness.unload.test.ts      # EI-2 — load A → unload → load B same-process
 │   │   │   ├── policy.test.ts              # YoloPolicy + PromptUserPolicy decisions
 │   │   │   └── eventNames.test.ts          # ensures every emitted event is in the catalog
 │   │   ├── integration/                    # @vscode/test-cli + Mocha
@@ -183,17 +184,12 @@ agent-arena/                                # repo root (governance + product si
 │   │   │   ├── roundtrip.test.ts           # FakeSdkAdapter end-to-end (US-1)
 │   │   │   └── permission.test.ts          # YoloPolicy ON/OFF (US-2)
 │   │   └── fixtures/
-│   │       ├── harness/
-│   │       │   ├── empty.json              # FR-026 — empty harness fixture
-│   │       │   └── with-session.json       # has one session entry by reference
 │   │       └── sdk/
-│   │           └── …                       # FakeSdkAdapter behavioral fixtures
-│   └── tests/harnesses/                    # constitution.md:549 location for harness fixtures
-│       └── README.md                       # NOTE: this duplicates extension/test/fixtures/harness/
-│                                           # — under EI-2's "tests/harnesses/ (or the spec-defined
-│                                           # equivalent)" clause, the spec defines extension/test/
-│                                           # fixtures/harness/ as the equivalent; this README points
-│                                           # readers there.
+│   │           └── …                       # FakeSdkAdapter behavioral fixtures (per CD-03)
+│   └── tests/
+│       └── harnesses/                      # EI-2 / constitution.md:549 — SOLE harness fixture location
+│           ├── empty.json                  # FR-026 — empty harness fixture
+│           └── with-session.json           # has one session entry by reference
 └── (existing repo-root files: README.md, CHANGELOG.md, LICENSE-WILL-LIVE-IN-extension/)
 ```
 
@@ -221,8 +217,21 @@ See [research.md](./research.md). Findings R-01 through R-11 cited inline above 
 | Webview ↔ host envelope spec (CD-04) | [contracts/webview-protocol.md](./contracts/webview-protocol.md) | Versioned envelope shape, message-type enum, Zod schemas, reject-unknown rule, correlation propagation |
 | SDK adapter interface (CD-03 fallback) | [contracts/sdk-adapter.ts](./contracts/sdk-adapter.ts) | The seam the extension imports; `CopilotSdkAdapter` (prod) and `FakeSdkAdapter` (test) implement it |
 | Permission policy interface (FR-019 / R-06) | [contracts/permission-policy.ts](./contracts/permission-policy.ts) | The typed interface that proves the "future per-tool policy without changing call sites" promise |
-| Data model (CD-02 / R-05) | [data-model.md](./data-model.md) | `AgentArenaHarness`, `Agent`, `HarnessedSession`, `CanonicalEvent`, `MessageEnvelope` types |
+| Data model (CD-02 / R-05) | [data-model.md](./data-model.md) | `AgentArenaHarness`, `Agent`, `HarnessedSession`, `CanonicalEvent`, `MessageEnvelope` types — **including unload semantics per the deputy's round-2 carry-forward (EI-2)** |
 | Manual live-SDK verification ritual (SC-002) | [quickstart.md](./quickstart.md) | DEFERRED to a subsequent commit — defines the timer, evidence, OS/version capture, where the trace excerpt lands in the PR |
+
+### Harness unload semantics (EI-2 — closes deputy round-2 carry-forward)
+
+EI-2 (`constitution.md:537-541`) requires that `loadHarness(A)` → `unload()` → `loadHarness(B)` work in the same process. CD-02 specified `save` and `load` but left `unload` ambiguous. This plan locks it down:
+
+- **`unload()` is REPLACE semantics with the empty harness.** Internally implemented as `loadHarness(EMPTY_HARNESS)` where `EMPTY_HARNESS = { harness_version, agents: [], activeSessionId: null, sessions: [] }`. There is no separate `unload` code path; load is the only mutating verb.
+- **In-memory state**: cleared in this order — (1) abort current turn on every active `SdkSessionHandle`, (2) `disconnect()` every handle (releases in-memory; preserves on-disk), (3) clear the agent registry, (4) clear `activeSessionId`.
+- **`workspaceState` (yolo state per CD-05)**: NOT cleared by load/unload. Yolo state is per-workspace user preference, not behavior-relevant runtime state per EI-2's definition. Loading harness B's `agents[].yoloMode` REPLACES the in-memory agent's yolo, but the persisted `workspaceState` entry is updated to match (so reload-after-restart preserves the loaded value).
+- **SDK session directories on disk**: NOT touched by `unload()` or `load()`. The SDK is the system of record for session content (R-05). When `loadHarness(B)` references a session not on disk, load fails for that session entry only (`state: "unrecoverable"`, emit `aa.harness.session.unrecoverable.v1`) — other sessions in B may still load successfully.
+- **Round-trip verification**: a unit test `extension/test/unit/harness.unload.test.ts` exercises load A → unload → load B → assert in-memory and on-disk states match B in the same process, with no process restart between transitions.
+- **Cleanup of orphaned SDK session directories**: out of scope for the scaffold. Future spec may add `client.deleteSession(id)` cleanup at unload time when the user explicitly asks for it; do not bake destructive behavior into `unload`.
+
+This semantics is binding for /speckit.implement and for `tasks.md`. The unit test is a **gate**: harness round-trip (FR-026 / SC-006) is not considered satisfied without the same-process unload test passing.
 
 ## Phase 2 — Tasks (NOT generated here)
 

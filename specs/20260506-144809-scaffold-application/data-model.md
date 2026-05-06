@@ -135,6 +135,46 @@ export interface HarnessedSession {
 3. Set `activeSessionId = harness.activeSessionId`.
 4. Emit `aa.harness.loaded.v1` with payload `{ agent_count, session_count, unrecoverable_count }`.
 
+### Unload semantics (`unload` — EI-2 same-process round-trip)
+
+`unload()` is `loadHarness(EMPTY_HARNESS)` where:
+
+```typescript
+const EMPTY_HARNESS: AgentArenaHarness = {
+  harness_version: "1.0.0",
+  agents: [],
+  activeSessionId: null,
+  sessions: [],
+};
+```
+
+There is no separate `unload` code path; load is the only mutating verb. Internal sequence at every `loadHarness(...)` call:
+
+1. **Abort** the current turn on every active `SdkSessionHandle` (best-effort; idempotent if no turn running).
+2. **`disconnect()`** every handle — releases in-memory resources, preserves on-disk session directories (per CD-02 / R-05; SDK is system of record).
+3. **Clear** the agent registry, the policy resolver's per-agent bindings, and `activeSessionId`.
+4. **Replace** in-memory state from the new harness's `agents[]` and `activeSessionId`.
+5. **Validate** every `sessions[]` entry per the load semantics above.
+6. **Reconcile** `workspaceState` yolo entries: for each agent in the new harness, write the loaded `yoloMode` to `workspaceState` (so a subsequent reload-after-restart preserves the loaded value); do NOT delete entries for agents not present (those persist as orphaned but harmless workspace state).
+
+**Sessions on disk are never touched by `loadHarness` or `unload`.** Cleanup of orphaned SDK session directories is out of scope for the scaffold; the SDK's `client.deleteSession(id)` is the explicit cleanup verb, surfaced through a future `harness.cleanupOrphanedSessions` command (not in this scaffold).
+
+### Same-process round-trip test (gate)
+
+`extension/test/unit/harness.unload.test.ts` MUST pass before /speckit.implement is considered complete:
+
+```typescript
+// Pseudocode
+const harnessA = await loadHarness(fixtureA);   // has session X
+const stateA = await snapshotInMemory();
+await loadHarness(EMPTY_HARNESS);               // unload
+expect(await snapshotInMemory()).toEqual(EMPTY_STATE);
+const harnessB = await loadHarness(fixtureB);   // also has session X (same id, same hash)
+expect((await snapshotInMemory()).agents.length).toBe(harnessB.agents.length);
+// Session X validates: still on disk, hash matches → state field absent (recoverable)
+expect(harnessB.sessions[0].state).toBeUndefined();
+```
+
 ---
 
 ## AgentArenaHarness (CD-02 / FR-024)

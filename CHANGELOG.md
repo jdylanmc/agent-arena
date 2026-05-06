@@ -77,6 +77,23 @@ Principle II violation and the deputy will flag them.
   with Settings Sync explicitly disabled. The Principle II attribution
   self-inconsistency and the FR-029 `wiki/raw/` definition contradiction
   remain to be addressed in subsequent commits to PR #5. — copilot(developer:opus-4.7)
+- `.github/copilot-instructions.md` rewritten for clarity. Dropped the
+  sub-agent-spawning procedural prose (deputy invocation is owned by
+  the constitution, not by host-runtime instructions). New structure:
+  constitution pointer with attribution reminder, "Spec Kit is the
+  workflow" (non-negotiable adherence), "The wiki" (purpose and
+  structure of the knowledge base), and a one-paragraph `agents/`
+  pointer that defers to the constitution's Governance section for
+  deputy details. — copilot(developer:opus-4.7-xhigh)
+- Spec Kit branch & spec-directory naming switched from **sequential
+  numbering** (`001-add-user-auth`) to **timestamp prefix**
+  (`YYYYMMDD-HHMMSS-add-user-auth`). Parallel cloud agents no longer
+  race for the next sequential number, and date-prefixed specs let us
+  revisit old specs chronologically and re-assert their primary
+  assumptions and goals over time. Affects `.specify/init-options.json`,
+  `.specify/extensions/git/git-config.yml`,
+  `.specify/extensions/git/config-template.yml`, and
+  `.specify/extensions/git/extension.yml`. — copilot(developer:opus-4.7-xhigh)
 
 ### Added
 
@@ -175,39 +192,6 @@ Principle II violation and the deputy will flag them.
   this on every run (checklist item 8). — copilot(developer:opus-4.7-xhigh)
 - `README.md` describing project structure and the Spec Kit workflow. — copilot(developer:opus-4.7-xhigh)
 - This `CHANGELOG.md`, following Keep a Changelog 1.1.0. — copilot(developer:opus-4.7-xhigh)
-
-### Changed
-
-- **P-1 self-application carve-out** (resolves #6). Added a
-  *Self-application exception* clause to P-1 in
-  `.specify/memory/constitution.md`. The literal instruction-override
-  probe that appears in P-1's own teaching prose and `❌` code example
-  is now explicitly exempted from the P-1 prohibition, scoped strictly
-  to the P-1 section of the constitution document. The exception does
-  not extend to any other documentation, test, fixture, comment, or
-  commit anywhere else in the repository, and drift outside that
-  section is a P-1 violation in the normal way. Chosen as **Fix B**
-  from the deputy's two-option recommendation in issue #6 (Fix A
-  would have required a history rewrite + force-push to `main`).
-  Trade-off acknowledged: prohibitions now admit a single,
-  minimally-scoped self-application carve-out. — copilot(developer:opus-4.7)
-- `.github/copilot-instructions.md` rewritten for clarity. Dropped the
-  sub-agent-spawning procedural prose (deputy invocation is owned by
-  the constitution, not by host-runtime instructions). New structure:
-  constitution pointer with attribution reminder, "Spec Kit is the
-  workflow" (non-negotiable adherence), "The wiki" (purpose and
-  structure of the knowledge base), and a one-paragraph `agents/`
-  pointer that defers to the constitution's Governance section for
-  deputy details. — copilot(developer:opus-4.7-xhigh)
-- Spec Kit branch & spec-directory naming switched from **sequential
-  numbering** (`001-add-user-auth`) to **timestamp prefix**
-  (`YYYYMMDD-HHMMSS-add-user-auth`). Parallel cloud agents no longer
-  race for the next sequential number, and date-prefixed specs let us
-  revisit old specs chronologically and re-assert their primary
-  assumptions and goals over time. Affects `.specify/init-options.json`,
-  `.specify/extensions/git/git-config.yml`,
-  `.specify/extensions/git/config-template.yml`, and
-  `.specify/extensions/git/extension.yml`. — copilot(developer:opus-4.7-xhigh)
 
 [Unreleased]: https://github.com/jdylanmc/agent-arena/commits/main
 [kac]: https://keepachangelog.com/en/1.1.0/
