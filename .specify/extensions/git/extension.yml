@@ -136,5 +136,5 @@ tags:
 
 config:
   defaults:
-    branch_numbering: sequential
+    branch_numbering: timestamp
     init_commit_message: "[Spec Kit] Initial commit"
