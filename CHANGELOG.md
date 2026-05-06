@@ -20,6 +20,18 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **SOLID SNAKE agent persona** under `agents/solid-snake/` — a
+  read-only, source-controlled agent designed to be spawned
+  autonomously in the background to monitor the repository for SOLID
+  object-oriented design violations (SRP, OCP, LSP, ISP, DIP). Renders
+  exactly two verdicts (**SOLID** / **NOT-SOLID**, the latter rendered
+  red where surfaces support color), maintains a single in-place
+  *running checklist* PR comment per PR that he updates as the PR
+  evolves, applies `SOLID` / `NOT-SOLID` labels, and files attributed
+  reports under `agents/solid-snake/reports/`. Identity:
+  `copilot(solid-snake:<model>)`. Trigger phrase:
+  `> Start the SOLID SNAKE agent workflow`. `agents/README.md` updated
+  to list him under *Available agents*. — copilot(developer:opus-4.7-xhigh)
 - **Engineering Invariants section** in the constitution (between
   Prohibitions and Knowledge Base). Holds binding architectural
   properties of the shipped product that the constitutional dev model
