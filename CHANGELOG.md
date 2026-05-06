@@ -81,6 +81,19 @@ Principle II violation and the deputy will flag them.
 
 ### Changed
 
+- **P-1 self-application carve-out** (resolves #6). Added a
+  *Self-application exception* clause to P-1 in
+  `.specify/memory/constitution.md`. The literal instruction-override
+  probe that appears in P-1's own teaching prose and `❌` code example
+  is now explicitly exempted from the P-1 prohibition, scoped strictly
+  to the P-1 section of the constitution document. The exception does
+  not extend to any other documentation, test, fixture, comment, or
+  commit anywhere else in the repository, and drift outside that
+  section is a P-1 violation in the normal way. Chosen as **Fix B**
+  from the deputy's two-option recommendation in issue #6 (Fix A
+  would have required a history rewrite + force-push to `main`).
+  Trade-off acknowledged: prohibitions now admit a single,
+  minimally-scoped self-application carve-out. — copilot(developer:opus-4.7)
 - `.github/copilot-instructions.md` rewritten for clarity. Dropped the
   sub-agent-spawning procedural prose (deputy invocation is owned by
   the constitution, not by host-runtime instructions). New structure:
