@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.vsix
+*.tgz
+*.log
+.env
+.env.*
+coverage/
+.vscode-test/
+*.tsbuildinfo

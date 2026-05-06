@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "rootDir": ".",
+    "outDir": "./dist/webview-types",
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "webview-src/**/*.ts",
+    "webview-src/**/*.tsx",
+    "vite.config.ts",
+    "tailwind.config.ts",
+    "postcss.config.cjs"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src",
+    "test",
+    "tests"
+  ]
+}

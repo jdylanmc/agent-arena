@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "rootDir": ".",
+    "outDir": "./dist",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "forceConsistentCasingInFileNames": true,
+    "useDefineForClassFields": true,
+    "declaration": false,
+    "sourceMap": true,
+    "removeComments": false,
+    "types": ["node", "vscode", "vitest/globals"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/unit/**/*.ts",
+    "test/integration/**/*.ts",
+    "test/fixtures/**/*.ts",
+    "esbuild.config.mjs",
+    ".vscode-test.mjs"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "webview-src",
+    "tests"
+  ]
+}

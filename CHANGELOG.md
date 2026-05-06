@@ -140,6 +140,27 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **`/speckit.implement` Phase 1 — `extension/` scaffolding**
+  (`tasks.md` T001–T010 ticked). Created the `extension/` package
+  with `publisher: jdylanmc`, `name: agent-arena`, `version: 0.0.1`,
+  `engines.vscode: ^1.95.0`, runtime deps `@github/copilot-sdk@^0.1.8`
+  + `zod@^4.3.6`. Build pipeline: esbuild for the extension-host
+  bundle (`src/extension.ts` → `dist/extension.js`, CJS, externals
+  `vscode`), Vite + React + Tailwind for the webview bundle
+  (`webview-src/` → `dist/webview/`, with a build-time copy step
+  syncing `src/protocol/*.ts` into `webview-src/protocol/` so both
+  sides share the envelope validator). Test harness: vitest for
+  unit (`test/unit/`), `@vscode/test-cli` + Mocha for integration
+  (`test/integration/`, unique `userDataDir` per run, retry policy).
+  ESLint flat config enforces the `no-restricted-imports` rule that
+  bans `@github/copilot-sdk` outside `src/sdk/CopilotSdkAdapter.ts`
+  (the SOLE permitted importer per CD-03 / R-02 / ISP) and bans
+  ad-hoc `console.log` per EI-1. `.prettierrc.json`,
+  `.vscodeignore`, `.gitignore`, MIT `LICENSE` (copyright "Dylan
+  McCurry"), placeholder activity-bar SVG icon (uses `currentColor`
+  for theme-aware tinting). Empty `src/`, `webview-src/`, `test/`,
+  `tests/harnesses/` directory tree pre-created. `npm install`
+  verification deferred to Phase 2 first commit. — copilot(developer:opus-4.7)
 - **SOLID SNAKE agent persona** under `agents/solid-snake/` — a
   read-only, source-controlled agent designed to be spawned
   autonomously in the background to monitor the repository for SOLID

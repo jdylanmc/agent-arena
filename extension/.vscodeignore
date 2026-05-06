@@ -1,0 +1,27 @@
+# Files NOT included in the published .vsix.
+# Source, tests, configs, and tooling never ship to consumers.
+
+src/**
+webview-src/**
+test/**
+tests/**
+
+tsconfig*.json
+*.config.*
+.vscode-test.mjs
+.eslintrc*
+.prettierrc*
+.gitignore
+
+node_modules/.cache/**
+*.map
+*.log
+.env
+.env.*
+
+# Everything inside dist/ EXCEPT what we ship.
+# The .vsix needs:
+#   - dist/extension.js (esbuild output)
+#   - dist/webview/** (vite output)
+#   - icons/** (activity bar SVG, etc.)
+#   - package.json, README.md, LICENSE, CHANGELOG.md
