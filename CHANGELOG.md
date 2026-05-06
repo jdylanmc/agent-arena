@@ -20,6 +20,43 @@ Principle II violation and the deputy will flag them.
 
 ### Changed
 
+- **`/speckit.plan` for `scaffold-application`**: produced
+  `specs/20260506-144809-scaffold-application/plan.md`,
+  `research.md` (Phase 0 — SDK + tooling research, with 11 numbered
+  findings R-01..R-11), `data-model.md` (canonical EI-1 envelope, Agent,
+  HarnessedSession, AgentArenaHarness, MessageEnvelope, PermissionPolicy,
+  SdkAdapter types), and `contracts/` (webview-protocol.md,
+  sdk-adapter.ts, permission-policy.ts). Headline outcomes:
+  **CD-03 falls to fallback A** — the SDK ships no consumer-facing test
+  harness (only internal CI mocks under `test/harness/`); we build an
+  `SdkAdapter` interface with a `FakeSdkAdapter` substitute. **CD-01
+  refined** to a canonical EI-1 log + a sidecar raw-OTel file (the SDK
+  writes the latter; the extension normalizes into the former), so the
+  user's "snap to SDK telemetry where possible, preserve observability"
+  direction is satisfied without losing SDK-internal span detail. Pinned
+  concrete `engines.vscode: ^1.95.0` (replacing FR-002's "current
+  LTS-line"), adopted `@vscode/test-cli` for integration tests
+  (replacing FR-002's `@vscode/test-electron`), set monorepo layout
+  with the shipped extension under `extension/`. Designed the typed
+  `PermissionPolicy` interface that FR-019 promised but did not specify.
+  Three open spec-text contradictions remain to be cleaned up in a
+  follow-up commit before `/speckit.tasks` (Principle II `-xhigh`
+  trailers in spec/checklist; FR-029 `wiki/raw/` definition;
+  spec Key Entities mention of `events.jsonl` per session).
+  — copilot(developer:opus-4.7)
+- **P-1 self-application carve-out** (resolves #6). Added a
+  *Self-application exception* clause to P-1 in
+  `.specify/memory/constitution.md`. The literal instruction-override
+  probe that appears in P-1's own teaching prose and `❌` code example
+  is now explicitly exempted from the P-1 prohibition, scoped strictly
+  to the P-1 section of the constitution document. The exception does
+  not extend to any other documentation, test, fixture, comment, or
+  commit anywhere else in the repository, and drift outside that
+  section is a P-1 violation in the normal way. Chosen as **Fix B**
+  from the deputy's two-option recommendation in issue #6 (Fix A
+  would have required a history rewrite + force-push to `main`).
+  Trade-off acknowledged: prohibitions now admit a single,
+  minimally-scoped self-application carve-out. — copilot(developer:opus-4.7)
 - **`/speckit.clarify` for `scaffold-application`**: encoded five clarifying
   decisions (CD-01..CD-05, newest-at-top per template) and rewrote
   FR-009 / FR-017 / FR-020 / FR-021 / FR-024 / FR-033 to match. CD-01 resolves
