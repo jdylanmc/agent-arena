@@ -140,6 +140,42 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **`/speckit.implement` Phase 2 (foundational types) — second wave**
+  (`tasks.md` T028–T034 ticked; running total: 24 of 91 tasks).
+  Landed the SDK adapter seam, supervisor state machine, and EI-1
+  EventEmitter — all with failing-test-first vitest coverage:
+    - `extension/src/sdk/SdkAdapter.ts` — ISP-segregated interfaces
+      (`SdkClientLifecycle`, `SdkSessionRegistry`, `SdkAdapter`
+      aggregate, `SdkSessionLifecycle`, `SdkSessionMessaging`,
+      `SdkSessionHandle` aggregate) plus `REQUIRED_BEHAVIORAL_CONTRACT`
+      mirror of contracts/sdk-adapter.ts.
+    - `extension/test/unit/sdk/FakeSdkAdapter.ts` — in-memory test
+      double exercising every behavior in
+      `REQUIRED_BEHAVIORAL_CONTRACT` (streaming deltas, permission
+      allow/deny, queued prompts, resume/list, startup failure,
+      runtime error). Replaces the SDK in unit + integration tests
+      without requiring a Copilot subscription (FR-033).
+    - `extension/src/sdk/lifecycle.ts` — supervisor state machine
+      (`notStarted → starting → ready → degraded → restarting →
+      ready | stopped`) with pure `nextState` transition function,
+      `Supervisor` class with observer-list dispatch (observer
+      errors swallowed to keep state-machine integrity), and
+      `canAcceptPrompts` predicate for early rejection in
+      `degraded`/`restarting`. Closes plan.md significant finding #8.
+    - `extension/src/telemetry/EventEmitter.ts` — single-writer JSONL
+      emitter to `${context.logUri}/agent-arena.events.jsonl`. Creates
+      parent directory; writes one CanonicalEvent per line with
+      trailing `\n`; subscriber notification with bounded recursion
+      guard (re-emitted `AA_EVENT_HANDLER_FAILED` events do not
+      re-trigger throwing subscribers); silent mode for tests; auto
+      UUID for callers using `emitNew()`.
+    - 8 test files, 91 tests total (envelope, types, event,
+      eventNames, harness shape, lifecycle, EventEmitter, adapter
+      contract). All green; `npm run typecheck` clean; `npm run lint`
+      clean (with refined `no-restricted-imports` policy permitting
+      type-only SDK imports in `SdkAdapter.ts`/`PermissionPolicy.ts`/
+      tests, value imports still restricted to `CopilotSdkAdapter.ts`).
+  — copilot(developer:opus-4.7)
 - **`/speckit.implement` Phase 2 (foundational types) — first wave**
   (`tasks.md` T022-T025, T037, T044-T045, T047-T048 ticked).
   Landed pure-TypeScript foundational modules + their failing-first

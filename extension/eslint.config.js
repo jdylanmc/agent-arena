@@ -64,17 +64,31 @@ export default [
     },
   },
   {
-    // CopilotSdkAdapter is the SOLE permitted importer of @github/copilot-sdk.
+    // CopilotSdkAdapter is the SOLE permitted importer of `@github/copilot-sdk`
+    // VALUE-side runtime imports (the CopilotClient constructor, etc.).
+    // Other files MAY type-import the SDK's exported types (TS erases these
+    // at compile time and they cannot leak runtime behavior).
     files: ["src/sdk/CopilotSdkAdapter.ts"],
     rules: {
       "no-restricted-imports": "off",
     },
   },
   {
-    // Tests are allowed console.* for debugging assertions.
+    // The adapter interface mirror file imports SDK TYPES only (PermissionHandler,
+    // SessionConfig, etc.). Type-only imports are allowed.
+    files: ["src/sdk/SdkAdapter.ts", "src/permission/PermissionPolicy.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Tests — including FakeSdkAdapter — may type-import SDK types to satisfy
+    // the adapter interface. Production `CopilotClient` runtime imports are
+    // still forbidden via the test layer's reliance on the adapter seam.
     files: ["test/**/*.ts"],
     rules: {
       "no-console": "off",
+      "no-restricted-imports": "off",
     },
   },
   {
