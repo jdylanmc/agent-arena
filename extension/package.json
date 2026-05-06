@@ -25,7 +25,7 @@
     "onCommand:agent-arena.harness.export",
     "onCommand:agent-arena.harness.import"
   ],
-  "main": "./dist/extension.js",
+  "main": "./dist/extension.cjs",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -75,11 +75,13 @@
     }
   },
   "scripts": {
-    "clean": "rimraf dist *.vsix",
+    "clean": "rimraf dist && rimraf --glob \"*.vsix\"",
     "build": "npm run build:host && npm run build:webview",
     "build:host": "node esbuild.config.mjs",
     "build:webview": "vite build",
     "dev": "node esbuild.config.mjs --watch",
+    "launch": "npm run build && code --extensionDevelopmentPath=. --new-window --disable-extensions",
+    "launch:current": "npm run build && code --extensionDevelopmentPath=. --reuse-window --disable-extensions",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vscode-test",

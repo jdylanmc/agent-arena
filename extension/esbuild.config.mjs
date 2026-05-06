@@ -17,7 +17,7 @@ const production = process.env.NODE_ENV === "production";
 const config = {
   entryPoints: ["src/extension.ts"],
   bundle: true,
-  outfile: "dist/extension.js",
+  outfile: "dist/extension.cjs",
   format: "cjs",
   platform: "node",
   target: "node20",
