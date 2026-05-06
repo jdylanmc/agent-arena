@@ -32,6 +32,20 @@ Principle II violation and the deputy will flag them.
   `copilot(solid-snake:<model>)`. Trigger phrase:
   `> Start the SOLID SNAKE agent workflow`. `agents/README.md` updated
   to list him under *Available agents*. — copilot(developer:opus-4.7-xhigh)
+- **First feature spec: `scaffold-application`** (`specs/20260506-144809-scaffold-application/`).
+  Establishes the minimal viable foundation for Agent Arena: a VS Code
+  extension (publisher `jdylanmc`, MIT license) that integrates the
+  GitHub Copilot SDK and proves an end-to-end primary-agent round-trip,
+  with binary yolo toggle (default OFF, dab-icon control) gating the
+  SDK's mandatory permission handler. Pulls SDK telemetry through the
+  built-in OpenTelemetry exporter to satisfy EI-1; ships a single-agent
+  harness skeleton (import/export commands + fixture) to satisfy EI-2;
+  seeds the wiki with medium-depth ingestions of `github/copilot-sdk`
+  and the VS Code Extensions API; bounds CI to `ubuntu-latest` +
+  `windows-latest`; mocks the SDK in CI and documents manual live
+  verification in the README. Resolves agent-arena#4. Subsequent specs
+  build the Swarm sidebar, background agents, workflows, and
+  fine-grained per-tool permissions on top of this scaffold. — copilot(developer:opus-4.7-xhigh)
 - **Engineering Invariants section** in the constitution (between
   Prohibitions and Knowledge Base). Holds binding architectural
   properties of the shipped product that the constitutional dev model
