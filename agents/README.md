@@ -18,6 +18,10 @@ agents/
     persona.md          ← the deputy's identity, scope, and rules
     reports/            ← the deputy's attributed report files
       .gitkeep
+  solid-snake/
+    persona.md          ← SOLID SNAKE's identity, scope, and rules
+    reports/            ← SOLID SNAKE's attributed report files
+      .gitkeep
 ```
 
 ## Available agents
@@ -46,6 +50,40 @@ When the developer agent sees this phrase, it MUST:
 2. Spawn a sub-agent under the attributed identity
    `<provider>(deputy:<model-id>)` using the persona content as the
    system prompt.
+3. Hand the sub-agent off to do its work and surface its report back
+   to the human.
+
+### `solid-snake/`
+
+**SOLID SNAKE** is a covert operator whose singular purpose is to
+ensure the codebase honors the five SOLID object-oriented design
+principles (SRP, OCP, LSP, ISP, DIP). He renders exactly two verdicts
+on any change he reviews: **SOLID** or **NOT-SOLID** (the latter
+preferably surfaced in red wherever labels or badges support color).
+
+SOLID SNAKE is read-only: he inspects diffs, open PRs, and the working
+tree, files attributed reports under `agents/solid-snake/reports/`,
+and maintains a single *running checklist* comment per PR that he
+updates in place as the PR evolves. He MUST NOT mutate anything
+outside that reports directory.
+
+He is designed to be spawned **autonomously, in the background**, to
+monitor the repository continuously, but he can also be run on demand
+against a specific PR or working tree.
+
+**Trigger phrase** (issued to the developer agent currently driving
+the working tree, or wired into a background runner):
+
+```
+> Start the SOLID SNAKE agent workflow
+```
+
+When the developer agent sees this phrase, it MUST:
+
+1. Read `agents/solid-snake/persona.md` end-to-end.
+2. Spawn a sub-agent under the attributed identity
+   `<provider>(solid-snake:<model-id>)` using the persona content as
+   the system prompt.
 3. Hand the sub-agent off to do its work and surface its report back
    to the human.
 
