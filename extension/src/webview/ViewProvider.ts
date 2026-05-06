@@ -246,14 +246,14 @@ export class PrimaryAgentViewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; img-src ${cspSource} https: data:; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+        content="default-src 'none'; img-src ${cspSource} https: data:; font-src ${cspSource}; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${cspSource};">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agent Arena · Primary Agent</title>
   <link rel="stylesheet" href="${baseUri}/assets/index.css" />
 </head>
 <body>
   <div id="root"></div>
-  <script nonce="${nonce}" type="module" src="${baseUri}/assets/index.js"></script>
+  <script nonce="${nonce}" type="module" crossorigin src="${baseUri}/assets/index.js"></script>
 </body>
 </html>`;
     }
