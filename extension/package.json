@@ -103,7 +103,8 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"webview-src/**/*.{ts,tsx}\" \"test/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.webview.json",
     "package": "vsce package --no-dependencies",
-    "vscode:prepublish": "npm run clean && npm run build"
+    "vscode:prepublish": "npm run clean && npm run build",
+    "postinstall": "node scripts/patch-vscode-jsonrpc.mjs"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.8",
