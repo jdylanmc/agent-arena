@@ -86,7 +86,7 @@ the persona defines the *word*.
 The persona uses these terms in narrative prose (running checklist
 comments, report summaries, issue bodies). Machine-readable fields
 (label names, JSON keys, file paths, identifiers) **stay in their
-directive form**. `BINARY-SIGN-OFF` remains `BINARY-SIGN-OFF` on the
+directive form**. `QA-VERIFIED` remains `QA-VERIFIED` on the
 label; it becomes "sign-off" in prose. `glados-qa-blocked` remains the
 label; it becomes "a logged operational deficiency" in prose.
 

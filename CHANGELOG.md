@@ -23,7 +23,7 @@ Principle II violation and the deputy will flag them.
 - **GLaDOS-QA composed agent** — a source-controlled agent that
   enforces quality and testability of the codebase autonomously, in
   the background. Renders three mutually-exclusive verdicts
-  (**BINARY-SIGN-OFF** ✅ / **DISAPPOINTMENT** ❌ /
+  (**QA-VERIFIED** ✅ / **DISAPPOINTMENT** ❌ /
   **FLAKY** ⚠) plus orthogonal coverage labels (`COVERAGE-HELD` /
   `COVERAGE-DROPPED` / `COVERAGE-UNTESTED`) on every PR she reviews,
   across six pillars: `tests-pass`, `coverage`, `crash-triage`,

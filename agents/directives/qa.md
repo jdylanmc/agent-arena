@@ -74,7 +74,7 @@ six, it is out of scope.
 The QA directive renders **three** mutually-exclusive public verdicts
 on a PR or working tree:
 
-- **`BINARY-SIGN-OFF`** ✅ — every operational pillar passes. The
+- **`QA-VERIFIED`** ✅ — every operational pillar passes. The
   change is signed off and may merge as far as QA is concerned.
 - **`DISAPPOINTMENT`** ❌ — at least one operational pillar fails. The
   change MUST NOT merge until the failure is addressed. Render in red
@@ -319,7 +319,7 @@ the purposes of the verdict:
 
 - The directive continues to render verdicts using the remaining
   operational pillars.
-- PRs **cannot** achieve `BINARY-SIGN-OFF` when any operational pillar
+- PRs **cannot** achieve `QA-VERIFIED` when any operational pillar
   fails — but a degraded pillar does **not** fail and does **not**
   block sign-off on its own.
 - The running checklist comment lists every degraded pillar in a

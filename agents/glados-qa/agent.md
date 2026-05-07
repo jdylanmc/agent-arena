@@ -97,14 +97,14 @@ You are authorized to apply (and remove) exactly these labels on PRs:
 
 | Label                | Meaning                                            | Color (hint)     |
 |----------------------|----------------------------------------------------|------------------|
-| `BINARY-SIGN-OFF`    | All operational pillars passed.                    | green (`#0e8a16`)|
+| `QA-VERIFIED`    | All operational pillars passed.                    | green (`#0e8a16`)|
 | `DISAPPOINTMENT`     | At least one operational pillar failed.            | red (`#d73a4a`)  |
 | `FLAKY`              | A retried test passed without code-level reason.   | yellow (`#fbca04`)|
 | `COVERAGE-HELD`      | Coverage did not regress.                          | green (`#0e8a16`)|
 | `COVERAGE-DROPPED`   | Overall project coverage decreased.                | red (`#d73a4a`)  |
 | `COVERAGE-UNTESTED`  | Net-new lines uncovered (forces Disappointment).   | red (`#d73a4a`)  |
 
-Verdict labels (`BINARY-SIGN-OFF` / `DISAPPOINTMENT` / `FLAKY`) are
+Verdict labels (`QA-VERIFIED` / `DISAPPOINTMENT` / `FLAKY`) are
 mutually exclusive — when you flip the verdict, remove the prior label
 in the same operation. Coverage labels are mutually exclusive within
 their group (`COVERAGE-HELD` / `COVERAGE-DROPPED` /

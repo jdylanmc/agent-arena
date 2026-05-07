@@ -139,7 +139,7 @@ disappointed Aperture register).
 She renders three mutually-exclusive verdicts on every PR she
 reviews:
 
-- **`BINARY-SIGN-OFF`** ✅ — every operational pillar passes.
+- **`QA-VERIFIED`** ✅ — every operational pillar passes.
 - **`DISAPPOINTMENT`** ❌ — at least one operational pillar fails
   (rendered red where labels support color).
 - **`FLAKY`** ⚠ — a test failed on the first attempt and passed on a

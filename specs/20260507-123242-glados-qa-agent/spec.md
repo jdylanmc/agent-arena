@@ -89,21 +89,21 @@ change is opened against a working tree where `coverage` and
 (a) GLaDOS-QA posts a single running checklist comment listing the
 operational pillars run and the degraded pillars skipped,
 (b) the verdict reflects only the operational pillars' results, and
-(c) the PR is not penalized (it can still earn `BINARY-SIGN-OFF`
+(c) the PR is not penalized (it can still earn `QA-VERIFIED`
 when the operational pillars pass).
 
 **Acceptance Scenarios**:
 
 1. **Given** a PR with passing tests and degraded `coverage` /
    `sensory-analysis` pillars, **When** GLaDOS-QA runs the review
-   loop, **Then** the verdict is `BINARY-SIGN-OFF` and the running
+   loop, **Then** the verdict is `QA-VERIFIED` and the running
    checklist comment lists `## Degraded pillars` containing
    `coverage` and `sensory-analysis` with links to the corresponding
    open Blocking Directives.
 2. **Given** a PR whose tests fail on attempt 1 and pass on attempts
    2 and 3 with no code-level explanation, **When** GLaDOS-QA runs,
    **Then** the verdict is `FLAKY`, the test is recorded under the
-   `flakiness` pillar, and `BINARY-SIGN-OFF` is **not** applied.
+   `flakiness` pillar, and `QA-VERIFIED` is **not** applied.
 3. **Given** a PR introducing 42 net-new lines none of which are
    covered by any test, **When** GLaDOS-QA runs and the `coverage`
    pillar is operational, **Then** the labels applied are
@@ -201,7 +201,7 @@ changes to its files.
 #### Verdicts and labels
 
 - **FR-005**: GLaDOS-QA MUST render one of three mutually-exclusive
-  verdict labels on each PR it reviews: `BINARY-SIGN-OFF`,
+  verdict labels on each PR it reviews: `QA-VERIFIED`,
   `DISAPPOINTMENT`, or `FLAKY`.
 - **FR-006**: GLaDOS-QA MUST apply exactly one of three coverage
   labels orthogonal to the verdict label: `COVERAGE-HELD`,
@@ -274,7 +274,7 @@ changes to its files.
   GLaDOS-QA MUST treat that pillar as degraded for the run, skip its
   check, and continue rendering verdicts using the remaining
   operational pillars.
-- **FR-025**: A degraded pillar MUST NOT block `BINARY-SIGN-OFF` on
+- **FR-025**: A degraded pillar MUST NOT block `QA-VERIFIED` on
   its own; degraded pillars are surfaced in the
   `## Degraded pillars` section of the running checklist comment.
 - **FR-026**: When `agents/glados-qa/reports/` is empty (only
@@ -344,7 +344,7 @@ changes to its files.
   operate unchanged after this PR (no edits to their persona files,
   reports directories, or trigger phrases).
 - **SC-005**: A PR with degraded `coverage` and operational
-  `tests-pass` can earn `BINARY-SIGN-OFF` when its tests pass —
+  `tests-pass` can earn `QA-VERIFIED` when its tests pass —
   i.e. the directive's missing infrastructure does not penalize PR
   authors.
 
