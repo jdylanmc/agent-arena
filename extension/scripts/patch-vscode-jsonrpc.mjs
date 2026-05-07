@@ -41,6 +41,10 @@ const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
 // Compatible with vscode-jsonrpc 8.2.1's actual file layout. If a future
 // version reshuffles, this script is no longer needed (per the comment
 // above) — but the structure check guards against silent breakage.
+//
+// The SDK uses BOTH `vscode-jsonrpc/node` (in session.js) AND
+// `vscode-jsonrpc/node.js` (in client.js), so the exports map must
+// expose both subpaths to the same target. Same for `./browser`.
 const expectedExports = {
     ".": {
         types: "./lib/common/api.d.ts",
@@ -52,15 +56,30 @@ const expectedExports = {
         types: "./lib/node/main.d.ts",
         default: "./lib/node/main.js",
     },
+    "./node.js": {
+        types: "./lib/node/main.d.ts",
+        default: "./lib/node/main.js",
+    },
     "./browser": {
+        types: "./lib/browser/main.d.ts",
+        default: "./lib/browser/main.js",
+    },
+    "./browser.js": {
         types: "./lib/browser/main.d.ts",
         default: "./lib/browser/main.js",
     },
 };
 
 if (pkg.exports) {
-    // Already patched (or upstream added their own); leave it alone.
-    process.exit(0);
+    // Already present — verify it's our patch (or upstream-compatible).
+    // If it's missing the ./node.js or ./browser.js subpaths the SDK
+    // imports, replace it. This handles the case where the patch script
+    // is upgraded (e.g., we initially shipped without ./node.js).
+    const hasNodeJs = pkg.exports["./node.js"] !== undefined;
+    const hasNode = pkg.exports["./node"] !== undefined;
+    if (hasNodeJs && hasNode) {
+        process.exit(0);
+    }
 }
 
 pkg.exports = expectedExports;
