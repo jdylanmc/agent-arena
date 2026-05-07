@@ -21,6 +21,8 @@ bug-fix PR MUST add a `wiki/bugs/` entry.
 |---|---|---|
 | [`sources/copilot-sdk.md`](sources/copilot-sdk.md) | `@github/copilot-sdk` — JSON-RPC SDK for programmatic control of the GitHub Copilot CLI | FR-027 |
 | [`sources/vscode-extensions-api.md`](sources/vscode-extensions-api.md) | VS Code Extensions API — contribution points + runtime APIs | FR-028 |
+| [`sources/vscode-source.md`](sources/vscode-source.md) | VS Code source itself — theme/branding alignment, core libraries + architectural patterns, terminal-integration deep-dive | reference |
+| [`sources/vscode-copilot.md`](sources/vscode-copilot.md) | GitHub Copilot integration in VS Code — auth providers, chat-extensions API, inline-completions, telemetry posture | reference, CD-10 |
 
 ## Glossary
 

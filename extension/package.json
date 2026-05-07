@@ -44,16 +44,11 @@
       "agentArena": [
         {
           "id": "agentArenaPrimaryView",
-          "name": "Primary Agent"
+          "name": "Primary Agent",
+          "type": "tree"
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "agentArenaPrimaryView",
-        "contents": "## Agent Arena\n\nThe primary agent runs in a dedicated editor-area panel — split, maximize, or drag it like any other tab.\n\n[Open Primary Agent Panel](command:agent-arena.openPrimaryAgent)\n\nSigned in to GitHub Copilot? You'll talk to a real model. Otherwise the panel falls back to demo mode so the round-trip surface is still visible.\n\n[Show trace log](command:agent-arena.showTraceLog)"
-      }
-    ],
     "commands": [
       {
         "command": "agent-arena.openPrimaryAgent",
@@ -109,6 +104,10 @@
   "dependencies": {
     "@github/copilot-sdk": "^0.1.8",
     "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/addon-unicode11": "^0.9.0",
+    "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
     "zod": "^4.3.6"
   },
