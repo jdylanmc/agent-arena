@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { bus } from "./protocol/messageBus.js";
 import { XtermTerminal, type XtermApi } from "./components/XtermTerminal.js";
 import { TerminalController } from "./lib/terminalController.js";
+import { AppHeader } from "./components/AppHeader.js";
+import { TabsRow, type TabId } from "./components/TabsRow.js";
+import { Sidebar, type AgentStatus, type SidebarAgent } from "./components/Sidebar.js";
+import { AgentPaneHeader } from "./components/AgentPaneHeader.js";
+import { CommandInput } from "./components/CommandInput.js";
+import { WorkflowStub } from "./components/WorkflowStub.js";
 
 interface AdapterStatus {
     adapterKind: "copilot" | "fake-demo";
@@ -11,17 +17,22 @@ interface AdapterStatus {
     yoloEnabled: boolean;
 }
 
+const PRIMARY_AGENT_ID = "primary";
+const PRIMARY_AGENT_DISPLAY_NAME = "Main Developer";
+
 export function App(): JSX.Element {
     const [status, setStatus] = useState<AdapterStatus | null>(null);
+    const [sessionStatus, setSessionStatus] = useState<AgentStatus>("connecting");
+    const [activeTab, setActiveTab] = useState<TabId>("swarm");
     const xtermRef = useRef<XtermApi>(null);
     const controllerRef = useRef<TerminalController | null>(null);
 
     if (controllerRef.current === null) {
         controllerRef.current = new TerminalController({
             submitPrompt: (text) =>
-                bus.send("prompt.submit", { promptText: text, agentId: "primary" }),
+                bus.send("prompt.submit", { promptText: text, agentId: PRIMARY_AGENT_ID }),
             setYolo: (enabled) =>
-                bus.send("yolo.set", { enabled, agentId: "primary" }),
+                bus.send("yolo.set", { enabled, agentId: PRIMARY_AGENT_ID }),
         });
     }
 
@@ -40,6 +51,7 @@ export function App(): JSX.Element {
             };
             if (payload.adapterLogin !== undefined) info.adapterLogin = payload.adapterLogin;
             setStatus(info);
+            setSessionStatus("idle");
             controller.setBootstrap(info);
             xtermRef.current?.focus();
         });
@@ -51,9 +63,11 @@ export function App(): JSX.Element {
             controller.onAssistantFinal();
         });
         const offState = bus.on("session.state", (payload) => {
+            setSessionStatus(payload.status === "running" ? "running" : "idle");
             if (payload.status === "idle") controller.onSessionIdle();
         });
         const offError = bus.on("error", (payload) => {
+            setSessionStatus("error");
             controller.onError(payload.message);
         });
 
@@ -71,53 +85,58 @@ export function App(): JSX.Element {
 
     return (
         <div className="flex h-screen w-screen flex-col bg-[#1e1e1e] text-[#d4d4d4]">
-            <Banner status={status} />
-            <div className="min-h-0 flex-1 px-2 py-1">
-                <XtermTerminal
-                    ref={xtermRef}
-                    onData={(data) => controllerRef.current?.handleInput(data)}
+            <AppHeader />
+            <TabsRow active={activeTab} onChange={setActiveTab} />
+            <div className="flex min-h-0 flex-1">
+                <Sidebar
+                    primary={primarySidebarEntry(sessionStatus)}
+                    selectedAgentId={PRIMARY_AGENT_ID}
+                    onSelect={() => {
+                        /* only one agent in this scaffold */
+                    }}
                 />
+                <main className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e]">
+                    {activeTab === "swarm" ? (
+                        <>
+                            <AgentPaneHeader
+                                agentName={PRIMARY_AGENT_DISPLAY_NAME}
+                                status={sessionStatus}
+                                workingDirectory={status?.workingDirectory ?? "…"}
+                                bannerSubtitle={status?.bannerSubtitle ?? "connecting"}
+                                onGearClick={() => {
+                                    // CD-08 §4 — gear is non-functional in this
+                                    // scaffold; the canonical-event hookup lands
+                                    // when the agent-settings spec ships.
+                                }}
+                            />
+                            <div className="min-h-0 flex-1 px-2 py-1">
+                                <XtermTerminal
+                                    ref={xtermRef}
+                                    onData={(data) =>
+                                        controllerRef.current?.handleInput(data)
+                                    }
+                                />
+                            </div>
+                            <CommandInput
+                                onSubmit={(text) =>
+                                    controllerRef.current?.submitFromInputBox(text)
+                                }
+                                disabled={sessionStatus === "connecting"}
+                            />
+                        </>
+                    ) : (
+                        <WorkflowStub />
+                    )}
+                </main>
             </div>
         </div>
     );
 }
 
-function Banner({ status }: { status: AdapterStatus | null }): JSX.Element {
-    if (!status) {
-        return (
-            <header className="border-b border-[#3c3c3c] bg-[#252526] px-3 py-1.5 text-xs text-[#cccccc]">
-                <span className="font-semibold">Agent Arena</span>{" "}
-                <span className="text-[#969696]">· Primary Agent · connecting…</span>
-            </header>
-        );
-    }
-    const adapterPill =
-        status.adapterKind === "copilot" ? (
-            <span className="ml-2 rounded bg-emerald-700/40 px-1.5 py-0.5 text-[10px] uppercase text-emerald-300">
-                Copilot{status.adapterLogin !== undefined ? ` · ${status.adapterLogin}` : ""}
-            </span>
-        ) : (
-            <span className="ml-2 rounded bg-amber-700/40 px-1.5 py-0.5 text-[10px] uppercase text-amber-300">
-                Demo
-            </span>
-        );
-    const yoloPill = status.yoloEnabled ? (
-        <span className="ml-2 rounded bg-red-700/40 px-1.5 py-0.5 text-[10px] uppercase text-red-300">
-            YOLO ON
-        </span>
-    ) : (
-        <span className="ml-2 rounded bg-zinc-700/40 px-1.5 py-0.5 text-[10px] uppercase text-zinc-300">
-            yolo off
-        </span>
-    );
-    return (
-        <header className="flex items-center gap-2 border-b border-[#3c3c3c] bg-[#252526] px-3 py-1.5 text-xs text-[#cccccc]">
-            <span className="font-semibold">Agent Arena</span>
-            <span className="text-[#969696]">· Primary Agent</span>
-            <span className="text-[#969696]">·</span>
-            <span className="font-mono text-[#cccccc]">{status.workingDirectory}</span>
-            {adapterPill}
-            {yoloPill}
-        </header>
-    );
+function primarySidebarEntry(status: AgentStatus): SidebarAgent {
+    return {
+        id: PRIMARY_AGENT_ID,
+        displayName: PRIMARY_AGENT_DISPLAY_NAME,
+        status,
+    };
 }

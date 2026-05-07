@@ -188,6 +188,32 @@ export class TerminalController {
         }
     }
 
+    /** Submit a complete prompt from the bottom React input box (per
+     *  CD-08 §6). The text is echoed to the xterm scrollback above the
+     *  prompt line so the conversation reads cleanly, then routed
+     *  through the same submitOrSlash code path as direct xterm input.
+     *  Pre-existing draft characters in the xterm input buffer are
+     *  preserved so the user doesn't lose work in flight. */
+    submitFromInputBox(text: string): void {
+        const trimmed = text.trim();
+        if (trimmed.length === 0) return;
+        // Echo the line above the current prompt. \r returns to column 0,
+        // \x1b[2K clears the line (wiping the in-flight prompt redraw),
+        // then we write what the user "typed" plus CRLF, then re-emit
+        // the prompt + any preserved draft from the xterm input buffer.
+        this.write("\r\x1b[2K");
+        this.writePrompt();
+        this.write(`${trimmed}${CRLF}`);
+        if (trimmed.length > 0) {
+            this.history.push(trimmed);
+            this.historyIndex = this.history.length;
+        }
+        this.submitOrSlash(trimmed);
+        if (this.inputBuffer.length > 0) {
+            this.write(this.inputBuffer);
+        }
+    }
+
     // -----------------------------------------------------------------------
 
     private handleCsiFinal(_params: string, final: string): void {
