@@ -18,18 +18,9 @@ export interface RegisterCommandsOptions {
 export function registerCommands(options: RegisterCommandsOptions): void {
     const { context, emitter, eventsLogPath } = options;
 
-    context.subscriptions.push(
-        vscode.commands.registerCommand("agent-arena.openPrimaryAgent", async () => {
-            emitter.emitNew({
-                level: "info",
-                event: EVENT_NAMES.AA_COMMAND_EXECUTED,
-                agent_id: "primary",
-                payload: { command: "agent-arena.openPrimaryAgent" },
-            });
-            await vscode.commands.executeCommand("workbench.view.extension.agentArena");
-            await vscode.commands.executeCommand("agentArenaPrimaryView.focus");
-        }),
-    );
+    // Note: `agent-arena.openPrimaryAgent` is registered in extension.ts —
+    // it owns the WebviewPanel lifecycle (per CD-07). Don't re-register it
+    // here or activation fails with "command already exists".
 
     context.subscriptions.push(
         vscode.commands.registerCommand("agent-arena.showTraceLog", async () => {
