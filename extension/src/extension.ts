@@ -35,7 +35,7 @@ import { registerPrimaryView } from "./activate/registerView.js";
 import { registerCommands } from "./activate/registerCommands.js";
 import { Agent } from "./state/Agent.js";
 import { AgentRegistry } from "./state/AgentRegistry.js";
-import { AgentPanelManager } from "./panel/AgentPanelManager.js";
+import { AgentTerminalManager } from "./panel/AgentTerminalManager.js";
 import { YoloStore } from "./state/yolo.js";
 import { YoloStatusBar } from "./state/yoloStatusBar.js";
 import { DefaultPolicyResolver } from "./permission/DefaultPolicyResolver.js";
@@ -48,7 +48,7 @@ interface ActivationState {
     yoloStore: YoloStore;
     yoloStatusBar: YoloStatusBar;
     registry: AgentRegistry;
-    panelManager: AgentPanelManager;
+    terminalManager: AgentTerminalManager;
     adapterSelection: AdapterSelection | undefined;
     primaryAgent: Agent | undefined;
 }
@@ -74,9 +74,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const yoloStatusBar = new YoloStatusBar(yoloStore, emitter, PRIMARY_AGENT_ID);
 
     const registry = new AgentRegistry();
-    const panelManager = new AgentPanelManager({
+    const terminalManager = new AgentTerminalManager({
         registry,
-        extensionUri: context.extensionUri,
         emitter,
     });
 
@@ -85,7 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         yoloStore,
         yoloStatusBar,
         registry,
-        panelManager,
+        terminalManager,
         adapterSelection: undefined,
         primaryAgent: undefined,
     };
@@ -125,7 +124,7 @@ export async function deactivate(): Promise<void> {
         agent_id: null,
         payload: {},
     });
-    activation.panelManager.dispose();
+    activation.terminalManager.dispose();
     try {
         await activation.registry.dispose();
     } catch {
@@ -157,7 +156,7 @@ async function openAgent(
     }
     try {
         await ensurePrimaryAgent(context);
-        activation.panelManager.open(agentId);
+        activation.terminalManager.open(agentId);
         activation.emitter.emitNew({
             level: "info",
             event: EVENT_NAMES.AA_COMMAND_EXECUTED,

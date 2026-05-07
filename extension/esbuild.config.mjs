@@ -5,14 +5,16 @@
 // dist/extension.cjs with `vscode` left as an external (resolved at runtime by
 // the host).
 //
-// The webview UI is bundled separately by Vite (see vite.config.ts).
-//
 // `@github/copilot-sdk` and its bundled CLI (`@github/copilot`) MUST be left
 // external. The SDK locates the CLI at runtime via `require.resolve()` and
 // spawns it as a child process; bundling them would break that resolution
 // and the extension would fail to talk to the real Copilot model. The
 // packaged extension ships with `node_modules/@github/copilot{,-sdk}` in
 // place, which the CJS runtime resolves via the standard Node algorithm.
+//
+// Per CD-13 (CD-07 reversal), there is no separate webview bundle — each
+// agent surfaces as a `vscode.Pseudoterminal`-backed `vscode.Terminal`
+// driven from the extension host directly.
 
 import * as esbuild from "esbuild";
 import process from "node:process";

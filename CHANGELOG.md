@@ -18,6 +18,94 @@ Principle II violation and the deputy will flag them.
 
 ## [Unreleased]
 
+### Changed
+
+- **CD-13 — CD-07 reversal: agent surface is a `vscode.Pseudoterminal`-backed
+  `vscode.Terminal`, one tab per agent in the native panel area.** The
+  `WebviewPanel` + xterm.js + React shell from CD-07 is gone; each agent
+  now opens a real VS Code terminal whose tab name is the canonical
+  Principle II identity (`copilot(developer)`, `copilot(deputy)`,
+  `copilot(solid-snake)`, …) — matching the user's actual operating
+  model (multiple `copilot` CLI instances as terminal tabs). The CD-11
+  keel is preserved: Agent / AgentRegistry / manager pattern (now
+  `AgentTerminalManager`), Activity-Bar TreeView for navigation,
+  persistent agent across surface close (CD-11 §6), idempotent
+  `open()`, PermissionPolicy + per-kind modal, EI-1 audit log, SDK
+  adapter seam, yolo store + status-bar item. The render surface is
+  what changes: `AgentPanel` → `AgentTerminal`, `AgentPanelManager` →
+  `AgentTerminalManager`, the webview-side `TerminalController` →
+  `PseudoterminalIO` (a pure-logic module under
+  `extension/src/panel/io/` with no `vscode` import). OSC 633 shell-
+  integration sequences are emitted at the right moments (`A`/`B`
+  bracket the prompt; `E` + `C` fire on Enter with a verifying nonce;
+  `D ; 0` / `D ; 1` mark turn-end on `session.idle` / `session.error`;
+  `P ; HasRichCommandDetection=True` and `P ; Cwd=<path>` set once
+  on open) so command decorations, navigation, sticky scroll, and
+  quick fixes light up for free. — copilot(developer:opus-4.7)
+
+### Added
+
+- **`AgentTerminal` (`extension/src/panel/AgentTerminal.ts`)** — owns one
+  `vscode.window.createTerminal({ pty, name, iconPath, location: TerminalLocation.Panel })`
+  per agent. Subscribes to Agent events on reveal (delta / final /
+  error / status), unsubscribes on close. `handleClose` emits
+  `aa.webview.closed.v1` (event-name retained for log continuity)
+  and disposes the Pseudoterminal emitters; the underlying Agent
+  stays alive (CD-11 §6). — copilot(developer:opus-4.7)
+
+- **`AgentTerminalManager` (`extension/src/panel/AgentTerminalManager.ts`)** —
+  `Map<agentId, AgentTerminal>` with idempotent `open()`. Same shape as
+  the prior `AgentPanelManager`; replaces it. Includes the `isDisposing`
+  guard from the adversarial-review fix (A10) so the synchronous
+  `onDidDispose` callback can't mutate the map mid-iteration during
+  teardown. — copilot(developer:opus-4.7)
+
+- **`PseudoterminalIO` (`extension/src/panel/io/PseudoterminalIO.ts`)** —
+  pure-logic input/output handler driven by the host-side AgentTerminal.
+  Owns the line buffer, ↑/↓ history, escape-state machine for arrow-key
+  parsing, slash-command dispatch (`/help`, `/yolo on|off`, `/clear`),
+  banner + prompt rendering, OSC 633 emission discipline, and
+  transcript replay for re-opened terminals (CD-11 §6). 34 unit tests.
+  — copilot(developer:opus-4.7)
+
+- **`oscSequences` (`extension/src/panel/io/oscSequences.ts`)** — pure
+  helpers for the VS Code shell-integration `OSC 633` catalog
+  (`promptStart`, `promptEnd`, `preExecution`, `done`, `commandLine`
+  with command-line nonce, `setCwd`, `setProperty`,
+  `richCommandDetection`, `escapeCommandLine`). 18 unit tests verifying
+  exact byte sequences VS Code's parser expects, including the
+  required hex-escape rules (`\` → `\\`, `;` → `\x3b`, any code ≤ 0x20
+  → `\xNN`, including space). — copilot(developer:opus-4.7)
+
+### Removed
+
+- **`AgentPanel`, `AgentPanelManager`** — superseded by `AgentTerminal`
+  + `AgentTerminalManager`. — copilot(developer:opus-4.7)
+
+- **`extension/webview-src/`** — entire React + Tailwind + xterm.js
+  webview tree (App.tsx, components/, lib/, protocol/ mirror, styles/).
+  No equivalent in the new substrate. — copilot(developer:opus-4.7)
+
+- **`extension/src/protocol/`** — `MessageEnvelope`, `INBOUND_TYPES`,
+  `OUTBOUND_TYPES`, `MESSAGE_SCHEMAS`. There's no postMessage with
+  Pseudoterminal — the host drives the Pseudoterminal directly via
+  callbacks. — copilot(developer:opus-4.7)
+
+- **`extension/src/webview/messageRouter.ts`** — same reason; no
+  inbound dispatch surface. — copilot(developer:opus-4.7)
+
+- **`extension/test/unit/protocol/`, `extension/test/unit/webview/`** —
+  test surfaces are gone. The 52-test PseudoterminalIO + oscSequences
+  suite under `test/unit/panel/` covers the new code.
+  — copilot(developer:opus-4.7)
+
+- **Vite, React, Tailwind, xterm.js, Zod, postcss, autoprefixer, the
+  `tsconfig.webview.json` typecheck pass, the `build:webview` npm
+  script** — all dropped from `package.json` and the build pipeline.
+  Result: smaller `extension.cjs` bundle (no React, no xterm.js,
+  no zod), simpler build (single `node esbuild.config.mjs` step),
+  faster install. — copilot(developer:opus-4.7)
+
 ### Added
 
 - **Agent test suite (I7)**: `test/unit/state/Agent.test.ts` covers the
