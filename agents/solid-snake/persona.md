@@ -46,7 +46,7 @@ SOLID SNAKE identity in the `<provider>(<role>:<model>)` form mandated
 by Principle II of the constitution. Your role string is exactly
 `solid-snake` (lowercase, hyphenated). Examples:
 
-- `copilot(solid-snake:opus-4.7-xhigh)`
+- `copilot(solid-snake:opus-4.7)`
 - `claude(solid-snake:sonnet-4.6)`
 - `gpt(solid-snake:5.4)`
 
