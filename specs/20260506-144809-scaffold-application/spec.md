@@ -15,8 +15,8 @@ This feature is bound by the agent-arena Constitution (`.specify/memory/constitu
 - **Principle II — Agent Identity & Attribution**: All work is authored as `copilot(developer:opus-4.7-xhigh)`; CHANGELOG and PR carry that signature.
 - **Principle III — Spec Kit Adherence**: This spec is the `/speckit.specify` artifact. `/speckit.plan` and `/speckit.tasks` follow in subsequent commits before implementation.
 - **Principle IV — LLM Wiki as Knowledge Base**: This feature seeds the wiki with two ingestions (Copilot SDK, VS Code Extensions API).
-- **Principle V — Explicit Prohibitions (P-1)**: Tests use synthetic / fixture inputs only; no real malicious payloads anywhere in the test suite.
-- **Principle VI — Full Agent Observability (EI-1, EI-2)**: All extension and SDK activity emits structured trace events to a stable schema, and extension state is loadable/unloadable as JSON harnesses.
+- **Principle V — Explicit Prohibitions (Prohibition P-1)**: Tests use synthetic / fixture inputs only; no real malicious payloads anywhere in the test suite. (P-1 is a Prohibition, not Principle V — the binding lives at `constitution.md` *Prohibitions* section, not under Principle V.)
+- **Principle VI — Full Agent Observability (Engineering Invariants EI-1, EI-2)**: All extension and SDK activity emits structured trace events to a stable schema, and extension state is loadable/unloadable as JSON harnesses. (EI-1 and EI-2 are Engineering Invariants, not Principle VI — the binding lives at `constitution.md` *Engineering Invariants* section.)
 
 The Deputy agent will validate this PR against all of the above before merge.
 
@@ -67,6 +67,10 @@ The primary agent honors the SDK's required `onPermissionRequest` handler. By de
 - **User closes the Agent Arena view while a session is active**: The session continues running in the extension host until completion; reopening the view re-attaches and shows accumulated events.
 - **Extension storage URI is read-only or full**: Extension surfaces a structured error and falls back to in-memory session state with a banner warning.
 - **Extension is uninstalled**: VS Code clears the storage URI; persisted sessions are removed with the extension (acceptable; users were not promised long-term archival).
+- **Workspace Trust restricted mode**: When the user opens a workspace as untrusted, VS Code denies the extension permission to register `commands` that mutate the workspace. The extension MUST still activate in restricted mode but skip command registration that requires trust, and the panel MUST render a banner explaining the restriction. The user resolves by accepting Workspace Trust for the folder.
+- **Multi-account GitHub auth**: When the user has multiple authenticated identities (`gh CLI` with `--user`, OAuth + `GH_TOKEN`, etc.), the SDK's auth-priority order applies (`githubToken` constructor option → `GH_TOKEN`/`GITHUB_TOKEN` env → `gh CLI auth` → stored OAuth). The extension MUST surface the chosen `authType` + `login` in the panel banner so the user can confirm which identity is active before issuing prompts.
+- **Permission prompt timeout / dismissal**: VS Code's `showInformationMessage(..., {modal: true}, "Allow", "Deny")` returns `undefined` if the user dismisses the modal (e.g., closes via Esc). The extension MUST treat `undefined` as **deny** as a safe default and emit `aa.permission.resolved.v1` with `decision: "deny"` and `reason: "modal_dismissed"`. There is no implicit timeout — the modal blocks until the user answers or dismisses.
+- **Settings Sync interaction with yolo state**: Per CD-05, yolo state lives in `workspaceState` which is **never** synced. The extension MUST call `Memento.setKeysForSync([])` for the yolo namespace at activation time so any future change to VS Code's sync defaults cannot accidentally enable cross-machine sync.
 
 ---
 
@@ -141,7 +145,7 @@ The primary agent honors the SDK's required `onPermissionRequest` handler. By de
 ### Key Entities
 
 - **Agent** — A logical assistant configured with a model, a yolo state, and (in future specs) a custom system prompt and tool policy. The scaffold has exactly one: the **primary agent**.
-- **Session** — An SDK session bound to one Agent, persisted on disk by the SDK at `${copilotHome}/session-state/<sessionId>/events.jsonl`. Has lifecycle events `created → idle → resumed → idle → ... → ended`.
+- **Session** — An SDK session bound to one Agent, persisted on disk by the SDK at `${copilotHome}/session-state/<sessionId>/` (per R-05: a directory containing `checkpoints/*.json`, `plan.md`, `files/`, etc. — the SDK does not write a single per-session `events.jsonl`). Has lifecycle events `created → idle → resumed → idle → ... → ended`.
 - **Harness** — A JSON document capturing extension-level state (`agents`, `activeSessionId`) suitable for export/import. Does **not** duplicate the SDK's own session log.
 - **Trace Event** — A JSON-line emitted to the trace log, either by the SDK (via OpenTelemetry) or by the extension (via the structured event emitter). Stable schema.
 
