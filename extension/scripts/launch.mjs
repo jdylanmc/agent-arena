@@ -1,14 +1,17 @@
 /*---------------------------------------------------------------------------------------------
  *  scripts/launch.mjs
  *
- *  Spawns `code --extensionDevelopmentPath=<absolute path to extension/>` so
- *  the launched VS Code instance reliably finds this extension's manifest.
+ *  Spawns `code --extensionDevelopmentPath=<absolute path to extension/> <repo root>`
+ *  so the launched VS Code instance:
+ *    - reliably finds this extension's manifest (absolute path, since
+ *      --extensionDevelopmentPath=. is unreliable on Windows cmd.exe)
+ *    - opens the agent-arena repo root as the workspace folder, so the
+ *      Pseudoterminal is automatically scoped to it (cwd, file pickers,
+ *      relative paths) and the Explorer shows project files end-to-end.
  *
- *  Why this isn't a one-liner in package.json: passing `.` as
- *  --extensionDevelopmentPath does not consistently resolve to an absolute
- *  path across platforms (especially Windows cmd.exe), and the failure mode
- *  is silent — VS Code launches a regular window with the activity-bar icon
- *  missing. Resolving to an absolute path here removes the guesswork.
+ *  Pass an alternate workspace path as the first argument if you want to
+ *  point the dev host at a different folder, e.g.
+ *      node scripts/launch.mjs D:/some/other/repo
  *--------------------------------------------------------------------------------------------*/
 
 import { spawn } from "node:child_process";
@@ -17,14 +20,18 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const extensionPath = resolve(__dirname, "..");
+const repoRoot = resolve(extensionPath, "..");
+const workspacePath = process.argv[2] ? resolve(process.argv[2]) : repoRoot;
 
 const codeCmd = process.platform === "win32" ? "code.cmd" : "code";
 
-console.log(`Launching VS Code dev host with extension at:\n  ${extensionPath}\n`);
+console.log(`Launching VS Code dev host:`);
+console.log(`  extension : ${extensionPath}`);
+console.log(`  workspace : ${workspacePath}\n`);
 
 const child = spawn(
     codeCmd,
-    ["--extensionDevelopmentPath", extensionPath],
+    ["--extensionDevelopmentPath", extensionPath, workspacePath],
     { stdio: "inherit", shell: true, detached: true },
 );
 
@@ -34,5 +41,4 @@ child.on("error", (err) => {
     process.exit(1);
 });
 
-// Detach so the launcher process can exit; the VS Code window keeps running.
 child.unref();

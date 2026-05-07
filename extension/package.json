@@ -49,7 +49,7 @@
     "viewsWelcome": [
       {
         "view": "agentArenaPrimaryView",
-        "contents": "## Agent Arena\n\nThe primary agent runs in a VS Code terminal — no bespoke UI.\n\n[Open Primary Agent Terminal](command:agent-arena.openPrimaryAgent)\n\n_Demo mode is active until the production CopilotSdkAdapter lands in task T035._\n\n[Show trace log](command:agent-arena.showTraceLog)"
+        "contents": "## Agent Arena\n\nThe primary agent runs in a VS Code integrated terminal — no bespoke UI.\n\n[Open Primary Agent Terminal](command:agent-arena.openPrimaryAgent)\n\nThe terminal is automatically scoped to your open workspace folder. If you're signed in to GitHub Copilot the agent talks to a real model; otherwise it falls back to demo mode so the round-trip is still visible.\n\n[Show trace log](command:agent-arena.showTraceLog)"
       }
     ],
     "commands": [

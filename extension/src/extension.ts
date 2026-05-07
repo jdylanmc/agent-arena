@@ -96,10 +96,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 }
 
                 const sel = adapterSelection;
+                const workingDirectory =
+                    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
                 const pty = new PrimaryAgentTerminal({
                     sdk: sel.adapter,
                     emitter: emitter!,
                     agentId: "primary",
+                    workingDirectory,
                     getYolo: () => yoloStore.get("primary"),
                     setYolo: (next) => {
                         void yoloStore.set("primary", next).then(() => {

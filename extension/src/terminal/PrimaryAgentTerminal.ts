@@ -59,6 +59,11 @@ export interface PrimaryAgentTerminalOptions {
      *  Used to advertise the active SDK adapter (e.g. "connected to GitHub
      *  Copilot as alice (user)" or "demo mode (not signed in)"). */
     bannerSubtitle?: string;
+    /** Working directory of the primary agent session. Surfaces in the
+     *  prompt and is forwarded to `sdk.createSession({ workingDirectory })`
+     *  so tool invocations resolve relative paths against the user's open
+     *  workspace folder. */
+    workingDirectory: string;
 }
 
 export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
@@ -73,12 +78,22 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
     private readonly getYolo: () => boolean;
     private readonly setYolo: (next: boolean) => void;
     private readonly bannerSubtitle: string;
+    private readonly workingDirectory: string;
 
     private inputBuffer = "";
     private session: SdkSessionHandle | undefined;
     private isStreaming = false;
     private hasReceivedFirstChunk = false;
     private currentTurnStartedAt = 0;
+
+    // Shell-style ↑/↓ input history (FR-014 affordance).
+    private readonly history: string[] = [];
+    private historyIndex = 0; // points to history.length when no recall is active
+
+    // Minimal ANSI/CSI sequence parser so arrow keys etc. don't pollute the
+    // input buffer with literal "[A" garbage.
+    private escState: "none" | "esc" | "csi" = "none";
+    private csiBuffer = "";
 
     constructor(opts: PrimaryAgentTerminalOptions) {
         this.sdk = opts.sdk;
@@ -87,6 +102,7 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
         this.getYolo = opts.getYolo;
         this.setYolo = opts.setYolo;
         this.bannerSubtitle = opts.bannerSubtitle ?? "demo mode";
+        this.workingDirectory = opts.workingDirectory;
     }
 
     open(_initialDimensions: vscode.TerminalDimensions | undefined): void {
@@ -108,9 +124,41 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
 
     handleInput(data: string): void {
         for (const ch of data) {
+            // ----- ANSI/CSI sequence parsing -------------------------------
+            if (this.escState === "csi") {
+                const code = ch.charCodeAt(0);
+                // Final byte: 0x40 - 0x7E. Everything else is parameter or
+                // intermediate; accumulate until we see the terminator.
+                if (code >= 0x40 && code <= 0x7e) {
+                    this.handleCsiFinal(this.csiBuffer, ch);
+                    this.csiBuffer = "";
+                    this.escState = "none";
+                } else {
+                    this.csiBuffer += ch;
+                    if (this.csiBuffer.length > 16) {
+                        // Runaway sequence — bail out cleanly.
+                        this.csiBuffer = "";
+                        this.escState = "none";
+                    }
+                }
+                continue;
+            }
+            if (this.escState === "esc") {
+                this.escState = ch === "[" ? "csi" : "none";
+                continue;
+            }
+            if (ch === "\x1b") {
+                this.escState = "esc";
+                continue;
+            }
+            // ----- Regular keystrokes --------------------------------------
             switch (ch) {
                 case "\r": // Enter
                     this.write(CRLF);
+                    if (this.inputBuffer.trim().length > 0) {
+                        this.history.push(this.inputBuffer);
+                    }
+                    this.historyIndex = this.history.length;
                     void this.submit(this.inputBuffer);
                     this.inputBuffer = "";
                     break;
@@ -149,17 +197,67 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
         }
     }
 
+    /** Handle an ANSI CSI sequence that was just completed. `params` is the
+     *  text between `\x1b[` and the final byte (often empty); `final` is
+     *  the terminator byte ("A" = Up, "B" = Down, etc.). */
+    private handleCsiFinal(params: string, final: string): void {
+        // params is currently unused but kept in the signature for keys
+        // like Home/End that may carry numeric parameters.
+        void params;
+        switch (final) {
+            case "A": // Up arrow → recall previous history entry
+                this.recallHistory(-1);
+                return;
+            case "B": // Down arrow → recall next history entry (or clear)
+                this.recallHistory(1);
+                return;
+            // Left/Right (D/C), Home/End (H/F), keypad codes (~) — ignored.
+            // Without intra-line cursor movement they'd just confuse the
+            // input buffer. Future: implement properly with cursor tracking.
+            default:
+                return;
+        }
+    }
+
+    private recallHistory(delta: -1 | 1): void {
+        if (this.history.length === 0) return;
+        const next = this.historyIndex + delta;
+        if (next < 0 || next > this.history.length) return;
+        this.historyIndex = next;
+        const recalled =
+            this.historyIndex >= this.history.length
+                ? ""
+                : (this.history[this.historyIndex] ?? "");
+        this.replaceCurrentLine(recalled);
+    }
+
+    private replaceCurrentLine(content: string): void {
+        // Carriage-return + erase-in-line (CSI 2K) clears the whole line
+        // regardless of cursor column, then we redraw prompt + new content.
+        this.write("\r\x1b[2K");
+        this.writePrompt();
+        this.write(content);
+        this.inputBuffer = content;
+    }
+
     private writeBanner(): void {
         const yoloLabel = this.getYolo() ? `${ANSI.red}YOLO ON${ANSI.reset}` : `${ANSI.green}yolo OFF${ANSI.reset}`;
         this.write(
             `${ANSI.bold}Agent Arena${ANSI.reset} ${ANSI.dim}· Primary Agent · ${this.bannerSubtitle} · ${ANSI.reset}${yoloLabel}${CRLF}` +
-                `${ANSI.dim}Type a prompt and press Enter. /help for slash commands. Ctrl+C to abort, Ctrl+L to clear.${ANSI.reset}${CRLF}` +
+                `${ANSI.dim}cwd:${ANSI.reset} ${this.workingDirectory}${CRLF}` +
+                `${ANSI.dim}Type a prompt and press Enter. /help for slash commands. ↑/↓ history, Ctrl+C abort, Ctrl+L clear.${ANSI.reset}${CRLF}` +
                 CRLF,
         );
     }
 
     private writePrompt(): void {
-        this.write(`${ANSI.cyan}> ${ANSI.reset}`);
+        // Shell-style prompt that surfaces the working directory the same
+        // way pwsh/bash do. Matches the look/feel of VS Code's integrated
+        // terminal (per the user's request) so the agent feels native to
+        // the Terminal panel. Format:  arena <cwd> ❯
+        this.write(
+            `${ANSI.green}arena${ANSI.reset} ${ANSI.cyan}${this.workingDirectory}${ANSI.reset} ${ANSI.bold}❯${ANSI.reset} `,
+        );
     }
 
     private write(text: string): void {
@@ -249,6 +347,7 @@ export class PrimaryAgentTerminal implements vscode.Pseudoterminal {
         const correlationId = mintCorrelationId();
         this.session = await this.sdk.createSession({
             sessionId,
+            workingDirectory: this.workingDirectory,
             onPermissionRequest: async (
                 request: { toolName?: string; summary?: string },
             ): Promise<{ kind: "approved" | "denied"; reason?: string }> => {
