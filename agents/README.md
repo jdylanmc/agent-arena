@@ -143,17 +143,19 @@ reviews:
 - **`QA-DISAPPOINTMENT`** ❌ — at least one operational pillar fails
   (rendered red where labels support color).
 
-She applies orthogonal **code labels** (`CODE-HELD`, `CODE-DROPPED`,
-`CODE-UNTESTED`) explaining the verdict's relationship to coverage,
-and an independent **`QA-FLAKY`** annotation when a test failed on
-the first attempt and passed on retry without a code-level
-explanation (which always forces `QA-DISAPPOINTMENT` — flakiness
-is never benign).
+She applies orthogonal **code-coverage labels** (`CODE-COVERAGE-HELD`,
+`CODE-COVERAGE-DROPPED`, `CODE-COVERAGE-UNTESTED`) explaining the
+verdict's relationship to coverage, and an independent **`QA-FLAKY`**
+annotation when a test failed on the first attempt and passed on
+retry without a code-level explanation (which always forces
+`QA-DISAPPOINTMENT` — flakiness is never benign).
 
 She is read-only outside her own surfaces: she writes only to
 `agents/glados-qa/reports/` and `agents/glados-qa/artifacts/`,
-maintains a single *running checklist* comment per PR (updated in
-place), and applies labels via the host runtime.
+maintains **two PR comments per PR updated in place** — a *running
+checklist* tracking pillar findings and a dedicated *coverage
+report* posted on every PR she reviews (including PRs where
+coverage held) — and applies labels via the host runtime.
 
 Her unique mechanism: **Blocking Directive issues**. When one of her
 six pillars cannot operate (no coverage tool configured, no UI test

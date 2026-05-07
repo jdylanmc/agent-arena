@@ -108,7 +108,7 @@ when the operational pillars pass).
 3. **Given** a PR introducing 42 net-new lines none of which are
    covered by any test, **When** GLaDOS-QA runs and the `coverage`
    pillar is operational, **Then** the labels applied are
-   `QA-DISAPPOINTMENT` and `CODE-UNTESTED`.
+   `QA-DISAPPOINTMENT` and `CODE-COVERAGE-UNTESTED`.
 
 ---
 
@@ -205,9 +205,9 @@ changes to its files.
   mutually-exclusive verdict labels on each PR it reviews:
   `QA-VERIFIED` or `QA-DISAPPOINTMENT`.
 - **FR-006**: GLaDOS-QA MUST apply exactly one of three code labels
-  orthogonal to the verdict label: `CODE-HELD`, `CODE-DROPPED`, or
-  `CODE-UNTESTED`.
-- **FR-007**: When `CODE-DROPPED` or `CODE-UNTESTED` is applied,
+  orthogonal to the verdict label: `CODE-COVERAGE-HELD`, `CODE-COVERAGE-DROPPED`, or
+  `CODE-COVERAGE-UNTESTED`.
+- **FR-007**: When `CODE-COVERAGE-DROPPED` or `CODE-COVERAGE-UNTESTED` is applied,
   the verdict label MUST be `QA-DISAPPOINTMENT` (coverage failure
   forces QA-DISAPPOINTMENT).
 - **FR-008**: When the verdict flips, the prior verdict label MUST be
@@ -235,13 +235,27 @@ changes to its files.
 
 #### Running checklist comment
 
-- **FR-013**: Each PR GLaDOS-QA reviews MUST carry exactly one
-  GLaDOS-QA comment, created on first review and updated in place
-  thereafter. GLaDOS-QA MUST NOT post additional comments on the
-  same PR.
+- **FR-013**: Each PR GLaDOS-QA reviews MUST carry **exactly two**
+  GLaDOS-QA comments, both created on first review and updated in
+  place thereafter: (a) a *running checklist* comment tracking
+  pillar findings across the six pillars, and (b) a dedicated
+  *coverage report* comment. GLaDOS-QA MUST NOT post additional
+  comments on the same PR.
 - **FR-014**: The running checklist comment MUST contain a
   `## Degraded pillars` section listing every pillar with an open
   Blocking Directive on this run (with links).
+- **FR-014a**: The coverage report comment MUST be posted on every
+  PR GLaDOS-QA reviews, including PRs where the verdict is
+  `QA-VERIFIED` and where coverage held. It MUST be updated in
+  place on every subsequent review (never appended, never
+  duplicated). It MUST contain the structure documented under
+  *Coverage report comment* in `agents/directives/qa.md` (Updated
+  timestamp, Base/Head/Delta header, applied code-coverage label,
+  Net-new lines table, Uncovered ranges, Project totals, Notes).
+- **FR-014b**: When the `coverage` pillar is degraded, the coverage
+  report comment MUST still be posted; its data sections are
+  replaced with a single block linking to the Blocking Directive.
+  The comment MUST NOT be suppressed under degradation.
 
 #### Blocking Directives
 

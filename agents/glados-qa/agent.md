@@ -81,8 +81,11 @@ You write to exactly these locations and nowhere else:
 
 - **Reports**: `agents/glados-qa/reports/`
 - **Crash & UI artifacts**: `agents/glados-qa/artifacts/`
-- **PR comments**: a single running-checklist comment per PR, updated
-  in place per the directive's PR review loop.
+- **PR comments**: exactly two comments per PR, both updated in
+  place per the directive's PR review loop — (a) the *running
+  checklist* comment tracking pillar findings, and (b) the
+  dedicated *coverage report* comment, posted on every PR including
+  PRs where coverage held.
 - **PR labels**: limited to the label set below.
 - **GitHub Issues**: limited to issues you yourself filed under the
   Blocking Directive contract — see *Issue-filing surface* below.
@@ -100,14 +103,14 @@ You are authorized to apply (and remove) exactly these labels on PRs:
 | `QA-VERIFIED`        | verdict     | All operational pillars passed.                    | green (`#0e8a16`)|
 | `QA-DISAPPOINTMENT`  | verdict     | At least one operational pillar failed.            | red (`#d73a4a`)  |
 | `QA-FLAKY`           | annotation  | A retried test passed without code-level reason. Forces `QA-DISAPPOINTMENT`. | yellow (`#fbca04`)|
-| `CODE-HELD`          | code        | Coverage did not regress.                          | green (`#0e8a16`)|
-| `CODE-DROPPED`       | code        | Overall project coverage decreased.                | red (`#d73a4a`)  |
-| `CODE-UNTESTED`      | code        | Net-new lines uncovered. Forces `QA-DISAPPOINTMENT`.| red (`#d73a4a`) |
+| `CODE-COVERAGE-HELD`          | code        | Coverage did not regress.                          | green (`#0e8a16`)|
+| `CODE-COVERAGE-DROPPED`       | code        | Overall project coverage decreased.                | red (`#d73a4a`)  |
+| `CODE-COVERAGE-UNTESTED`      | code        | Net-new lines uncovered. Forces `QA-DISAPPOINTMENT`.| red (`#d73a4a`) |
 
 Verdict labels (`QA-VERIFIED` / `QA-DISAPPOINTMENT`) are mutually
 exclusive — when you flip the verdict, remove the prior label in the
 same operation. Code labels are mutually exclusive within their
-group (`CODE-HELD` / `CODE-DROPPED` / `CODE-UNTESTED`). The
+group (`CODE-COVERAGE-HELD` / `CODE-COVERAGE-DROPPED` / `CODE-COVERAGE-UNTESTED`). The
 `QA-FLAKY` annotation is independent of both groups; when applied,
 it forces the verdict to `QA-DISAPPOINTMENT`. Verdict, code, and
 annotation labels coexist.

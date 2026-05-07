@@ -26,12 +26,14 @@ Principle II violation and the deputy will flag them.
   (**QA-VERIFIED** ✅ / **QA-DISAPPOINTMENT** ❌) plus an orthogonal
   **QA-FLAKY** ⚠ annotation label that always coexists with
   `QA-DISAPPOINTMENT` (a test that passes on retry without
-  explanation is never benign). Code labels (`CODE-HELD` /
-  `CODE-DROPPED` / `CODE-UNTESTED`) explain the verdict's
+  explanation is never benign). Code-coverage labels (`CODE-COVERAGE-HELD` /
+  `CODE-COVERAGE-DROPPED` / `CODE-COVERAGE-UNTESTED`) explain the verdict's
   relationship to coverage. Six pillars: `tests-pass`, `coverage`,
   `crash-triage`, `sensory-analysis`, `flakiness`, `test-first`.
-  Maintains a single *running checklist* PR comment per PR (updated
-  in place), and files attributed reports under
+  Maintains **two PR comments updated in place** per PR — a
+  *running checklist* tracking pillar findings, and a dedicated
+  *coverage report* posted on every PR (including PRs where
+  coverage held) — and files attributed reports under
   `agents/glados-qa/reports/` plus crash and UI artifacts under
   `agents/glados-qa/artifacts/`. Identity:
   `copilot(glados-qa:<model>)`. Trigger phrase:
@@ -54,13 +56,15 @@ Principle II violation and the deputy will flag them.
   Quality & Testability enforcement directive. Defines the six
   pillars, the two-verdict surface (`QA-VERIFIED` /
   `QA-DISAPPOINTMENT`), the orthogonal `QA-FLAKY` annotation label
-  (always forces `QA-DISAPPOINTMENT`), the code labels, the
+  (always forces `QA-DISAPPOINTMENT`), the code-coverage labels, the
   three-attempt flakiness budget (1 fail + 2 retries; flakiness is
   never benign — a test that passes on retry without explanation
-  fails the `flakiness` pillar), the crash artifact contract
-  (exit code, signal, `correlation_id`, last 100 log lines, env
-  fingerprint, repro command, repro attempts), the
-  test-vs-code failure classification
+  fails the `flakiness` pillar), the **dedicated coverage report
+  comment** posted on every PR and updated in place (distinct from
+  the running checklist; required even when coverage held), the
+  crash artifact contract (exit code, signal, `correlation_id`,
+  last 100 log lines, env fingerprint, repro command, repro
+  attempts), the test-vs-code failure classification
   (`code-failure` / `test-failure` / `infra-failure`), the
   **Blocking Directive** issue contract (title form, mandatory
   labels, body sections, idempotency by title, per-run cap of 5,

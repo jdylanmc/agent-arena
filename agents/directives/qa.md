@@ -95,16 +95,16 @@ are findings:
   always `QA-DISAPPOINTMENT`. The annotation persists on the PR
   alongside the verdict so the cause is visible at a glance.
 
-### Coverage labels (orthogonal)
+### Code-coverage labels (orthogonal)
 
 Coverage findings carry their own labels because they are independent
 of the test-execution outcome:
 
-- **`CODE-HELD`** ✅ — coverage did not drop and net-new lines are
+- **`CODE-COVERAGE-HELD`** ✅ — coverage did not drop and net-new lines are
   exercised.
-- **`CODE-DROPPED`** ❌ — overall project coverage decreased.
+- **`CODE-COVERAGE-DROPPED`** ❌ — overall project coverage decreased.
   Forces `QA-DISAPPOINTMENT`.
-- **`CODE-UNTESTED`** ❌ — net-new lines exist that no test
+- **`CODE-COVERAGE-UNTESTED`** ❌ — net-new lines exist that no test
   exercises, even if overall coverage held. Forces `QA-DISAPPOINTMENT`.
 
 Coverage labels coexist with the public verdict label; together they
@@ -153,17 +153,103 @@ push):
    checklist* created on first review and **updated in place** on
    every subsequent review. Findings are tracked open / resolved /
    superseded; resolved findings are struck through, never deleted.
-5. **Apply labels.** Apply the verdict label and any coverage labels.
-   Verdict labels are mutually exclusive (remove the prior one in the
-   same operation). Coverage labels are mutually exclusive within
-   their group (`CODE-HELD` / `CODE-DROPPED` /
-   `CODE-UNTESTED`).
-6. **Persist the finding** in the run report under the composed
+5. **Update the coverage report comment.** Each PR also carries
+   **exactly one** dedicated coverage report comment authored by
+   this directive — distinct from the running checklist. It is
+   created on first review and **updated in place** on every
+   subsequent review (never appended, never duplicated). The
+   coverage report is filed even when the verdict is `QA-VERIFIED`
+   and even when coverage is held. See *Coverage report comment*
+   below for the required structure.
+6. **Apply labels.** Apply the verdict label and any code-coverage
+   labels. Verdict labels are mutually exclusive (remove the prior
+   one in the same operation). Code-coverage labels are mutually
+   exclusive within their group (`CODE-COVERAGE-HELD` /
+   `CODE-COVERAGE-DROPPED` / `CODE-COVERAGE-UNTESTED`).
+7. **Persist the finding** in the run report under the composed
    agent's reports directory (e.g. `agents/<composed-name>/reports/`).
 
 If the host runtime grants only one of {comment, label, file}, prefer
 the comment first, then the label, then the report — but always file
 the report before exiting.
+
+## Coverage report comment
+
+Code coverage is a first-class measurement. Every PR the directive
+reviews carries a dedicated coverage report comment in addition to
+the running checklist. The coverage report:
+
+- Is **always present** on every PR the directive reviews — even on
+  documentation-only PRs (where it states "no executable change") and
+  even when the verdict is `QA-VERIFIED` with `CODE-COVERAGE-HELD`.
+- Is **exactly one comment per PR**, created on first review and
+  **updated in place** on every subsequent review. Never appended,
+  never duplicated.
+- Is **distinct from the running checklist comment**. The running
+  checklist tracks pillar findings across all six pillars; the
+  coverage report is the authoritative coverage record.
+- Is **kept up to date** every run. When the underlying numbers change
+  (new commits pushed, base branch advanced, coverage tooling
+  re-run), the comment is rewritten in place. When the diff scope
+  changes, the comment is rewritten in place.
+- Is **idempotent**: if the directive cannot locate its prior coverage
+  report comment for a PR (e.g. the comment was deleted), it files a
+  new one and records the recovery in the run report.
+
+### Required structure
+
+```markdown
+# Coverage Report — PR #<num>
+
+**Updated**: <YYYY-MM-DD HH:MM:SS UTC>
+**Base**: <merge-base sha> @ <coverage %>
+**Head**: <head sha> @ <coverage %>
+**Delta**: <signed coverage % delta>
+**Label**: `CODE-COVERAGE-HELD` | `CODE-COVERAGE-DROPPED` | `CODE-COVERAGE-UNTESTED`
+
+## Summary
+
+One line stating whether coverage held, dropped, or whether net-new
+lines are uncovered. Reference the label.
+
+## Net-new lines
+
+| File | Lines added | Lines covered | Coverage % | Status |
+|------|-------------|---------------|-----------:|--------|
+| `src/foo.ts` | 24 | 24 | 100% | ✅ |
+| `src/bar.ts` | 18 | 0 | 0% | ❌ uncovered |
+
+## Uncovered ranges (if any)
+
+- `src/bar.ts:42-58` — net-new function `parseFoo`, no test references it.
+- `src/baz.ts:101-103` — net-new branch on the `is_admin` path.
+
+## Project totals
+
+| Metric | Base | Head | Delta |
+|-------:|-----:|-----:|------:|
+| Statements | 84.2% | 84.7% | +0.5% |
+| Branches   | 71.0% | 71.0% |  0.0% |
+| Functions  | 88.4% | 88.4% |  0.0% |
+| Lines      | 84.6% | 85.0% | +0.4% |
+
+## Notes
+
+Anything explanatory: skipped files, intentionally untested code with
+justification (and a link to the justification), tooling caveats,
+degraded-pillar notes if `coverage` was skipped this run.
+
+---
+*Maintained by `<provider>(<role-string>:<model-id>)`. This comment
+is rewritten in place on every review; do not reply inline.*
+```
+
+When the `coverage` pillar is degraded (open Blocking Directive on
+coverage tooling), the coverage report comment still appears, but
+the data sections are replaced with a single block stating the
+pillar is degraded and linking to the Blocking Directive issue. The
+comment is **not** suppressed under degradation — its absence would
+be ambiguous.
 
 ## Crash artifact contract
 
