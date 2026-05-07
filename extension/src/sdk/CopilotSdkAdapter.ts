@@ -9,23 +9,41 @@
  *  This file is the only place the rest of the extension talks to the real
  *  Copilot CLI. Tests + demo mode use `FakeSdkAdapter`. The selector at
  *  `selectAdapter.ts` decides between them based on auth status.
+ *
+ *  The SDK ships as ESM-only (its package.json is `"type": "module"` and
+ *  the `exports` map exposes only an `import` condition). Our extension
+ *  host bundle is CJS (VS Code's contract for activate()/deactivate()),
+ *  so we cannot `require()` it. Dynamic `import()` works in CJS modules
+ *  and is preserved by esbuild for externalized packages, so we lazy-load
+ *  the SDK on `start()`. Type-only imports below are erased at compile
+ *  time and therefore do not require a runtime resolution path.
  *--------------------------------------------------------------------------------------------*/
 
-import {
+import type {
     CopilotClient,
-    approveAll,
-    type CopilotSession,
-    type CopilotClientOptions,
-    type GetAuthStatusResponse,
-    type ModelInfo,
-    type SessionConfig,
-    type ResumeSessionConfig,
-    type MessageOptions,
-    type PermissionHandler,
-    type SessionEventType,
-    type TypedSessionEventHandler,
+    CopilotSession,
+    CopilotClientOptions,
+    GetAuthStatusResponse,
+    ModelInfo,
+    SessionConfig,
+    ResumeSessionConfig,
+    MessageOptions,
+    PermissionHandler,
+    SessionEventType,
+    TypedSessionEventHandler,
 } from "@github/copilot-sdk";
 import type { SdkAdapter, SdkSessionHandle } from "./SdkAdapter.js";
+
+type SdkModule = typeof import("@github/copilot-sdk");
+
+let cachedSdkModule: SdkModule | undefined;
+
+async function loadSdkModule(): Promise<SdkModule> {
+    if (!cachedSdkModule) {
+        cachedSdkModule = await import("@github/copilot-sdk");
+    }
+    return cachedSdkModule;
+}
 
 export class CopilotSdkAdapter implements SdkAdapter {
     private client: CopilotClient | undefined;
@@ -34,14 +52,16 @@ export class CopilotSdkAdapter implements SdkAdapter {
     async start(opts: { copilotHome: string; telemetryFilePath: string }): Promise<void> {
         if (this.started) return;
 
-        // The SDK's CopilotClientOptions (v0.1.8) doesn't expose a `telemetry`
-        // or `copilotHome` field — those are configured via env vars to the
-        // bundled CLI. We redirect COPILOT_HOME via env so the SDK's session
-        // state doesn't pollute the user's `~/.copilot/`. Telemetry-file
-        // routing is deferred until the SDK exposes `TelemetryConfig` on
-        // CopilotClientOptions; until then we rely on the SDK's default log
-        // location and the canonical EI-1 log catches the events that matter
-        // (per CD-01 normalization).
+        const sdk = await loadSdkModule();
+
+        // The SDK's CopilotClientOptions (v0.1.32) doesn't expose a
+        // `telemetry` or `copilotHome` field — those are configured via
+        // env vars to the bundled CLI. We redirect COPILOT_HOME via env
+        // so the SDK's session state doesn't pollute the user's
+        // `~/.copilot/`. Telemetry-file routing is deferred until the SDK
+        // exposes `TelemetryConfig` on CopilotClientOptions; until then
+        // we rely on the SDK's default log location and the canonical
+        // EI-1 log catches the events that matter (per CD-01).
         const options: CopilotClientOptions = {
             env: {
                 ...process.env,
@@ -52,18 +72,19 @@ export class CopilotSdkAdapter implements SdkAdapter {
             autoRestart: true,
             logLevel: "warning",
         };
-        this.client = new CopilotClient(options);
+        this.client = new sdk.CopilotClient(options);
         await this.client.start();
         this.started = true;
-        // telemetryFilePath is intentionally unused here — it's still useful
-        // for the canonical-log adapter (separately wired in extension.ts).
+        // telemetryFilePath is intentionally unused here — it's still
+        // useful for the canonical-log adapter (separately wired in
+        // extension.ts).
         void opts.telemetryFilePath;
     }
 
     async stop(): Promise<void> {
         if (!this.client) return;
-        // CopilotClient.stop() returns Error[] (cleanup errors). We emit nothing
-        // here; the caller (extension.ts) handles failures.
+        // CopilotClient.stop() returns Error[] (cleanup errors). We emit
+        // nothing here; the caller (extension.ts) handles failures.
         await this.client.stop();
         this.client = undefined;
         this.started = false;
@@ -82,11 +103,12 @@ export class CopilotSdkAdapter implements SdkAdapter {
         opts?: ResumeSessionConfig & { onPermissionRequest?: PermissionHandler },
     ): Promise<SdkSessionHandle> {
         const client = this.requireClient();
+        const sdk = await loadSdkModule();
         // ResumeSessionConfig requires onPermissionRequest. Default to
         // approveAll if the caller didn't supply one (edge case — the
         // PrimaryAgentTerminal always supplies one).
         const cfg: ResumeSessionConfig = {
-            onPermissionRequest: opts?.onPermissionRequest ?? approveAll,
+            onPermissionRequest: opts?.onPermissionRequest ?? sdk.approveAll,
             ...(opts ?? {}),
         };
         const session = await client.resumeSession(sessionId, cfg);
@@ -98,7 +120,8 @@ export class CopilotSdkAdapter implements SdkAdapter {
         const list = await client.listSessions();
         return list.map((s) => ({
             sessionId: s.sessionId,
-            createdAt: s.startTime instanceof Date ? s.startTime.toISOString() : new Date().toISOString(),
+            createdAt:
+                s.startTime instanceof Date ? s.startTime.toISOString() : new Date().toISOString(),
         }));
     }
 
@@ -153,11 +176,11 @@ function wrapSession(session: CopilotSession): SdkSessionHandle {
             return { dispose: () => unsubscribe() };
         },
         async abortCurrentTurn(): Promise<void> {
-            // The SDK doesn't expose an abort-turn primitive in v0.1.8.
-            // Per R-11b this lands when the SDK ships one; for now this is a
-            // no-op so the adapter contract stays satisfied. The terminal's
-            // Ctrl+C handler catches this case and disconnects the session
-            // if the user really wants to stop a runaway turn.
+            // The SDK doesn't expose an abort-turn primitive in v0.1.32.
+            // Per R-11b this lands when the SDK ships one; for now this is
+            // a no-op so the adapter contract stays satisfied. The
+            // terminal's Ctrl+C handler catches this case and disconnects
+            // the session if the user really wants to stop a runaway turn.
         },
         async disconnect(): Promise<void> {
             await session.disconnect();
