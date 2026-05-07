@@ -33,8 +33,9 @@ import type {
     TypedSessionEventHandler,
 } from "@github/copilot-sdk";
 import type { SdkAdapter, SdkSessionHandle } from "./SdkAdapter.js";
+import type * as CopilotSdkModule from "@github/copilot-sdk";
 
-type SdkModule = typeof import("@github/copilot-sdk");
+type SdkModule = typeof CopilotSdkModule;
 
 let cachedSdkModule: SdkModule | undefined;
 

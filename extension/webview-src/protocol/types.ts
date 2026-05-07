@@ -66,6 +66,18 @@ export const ErrorMessageSchema = z.object({
     message: z.string().min(1),
     recoverable: z.boolean(),
 });
+/** Initial bootstrap payload sent by the host immediately after the
+ *  webview reports itself ready. Carries everything the React shell needs
+ *  to render its banner (cwd, adapter kind/login, yolo state) without a
+ *  separate round-trip per field. Per CD-07. */
+export const AgentBootstrapSchema = z.object({
+    agentId: z.string().min(1),
+    workingDirectory: z.string().min(1),
+    adapterKind: z.enum(["copilot", "fake-demo"]),
+    adapterLogin: z.string().optional(),
+    bannerSubtitle: z.string().min(1),
+    yoloEnabled: z.boolean(),
+});
 
 // =============================================================================
 // type enum + dispatch table
@@ -81,6 +93,7 @@ export const INBOUND_TYPES = [
 
 /** Outbound (host → webview) message types. */
 export const OUTBOUND_TYPES = [
+    "agent.bootstrap",
     "assistant.delta",
     "assistant.message.final",
     "permission.prompt",
@@ -103,6 +116,7 @@ export const MESSAGE_SCHEMAS = {
     "prompt.submit": PromptSubmitSchema,
     "yolo.set": YoloSetSchema,
     "permission.respond": PermissionRespondSchema,
+    "agent.bootstrap": AgentBootstrapSchema,
     "assistant.delta": AssistantDeltaSchema,
     "assistant.message.final": AssistantMessageFinalSchema,
     "permission.prompt": PermissionPromptSchema,

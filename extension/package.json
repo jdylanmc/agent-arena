@@ -17,7 +17,9 @@
     "vscode": "^1.95.0",
     "node": ">=20.0.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
     "onView:agentArenaPrimaryView",
     "onCommand:agent-arena.openPrimaryAgent",
@@ -49,7 +51,7 @@
     "viewsWelcome": [
       {
         "view": "agentArenaPrimaryView",
-        "contents": "## Agent Arena\n\nThe primary agent runs in a VS Code integrated terminal — no bespoke UI.\n\n[Open Primary Agent Terminal](command:agent-arena.openPrimaryAgent)\n\nThe terminal is automatically scoped to your open workspace folder. If you're signed in to GitHub Copilot the agent talks to a real model; otherwise it falls back to demo mode so the round-trip is still visible.\n\n[Show trace log](command:agent-arena.showTraceLog)"
+        "contents": "## Agent Arena\n\nThe primary agent runs in a dedicated editor-area panel — split, maximize, or drag it like any other tab.\n\n[Open Primary Agent Panel](command:agent-arena.openPrimaryAgent)\n\nSigned in to GitHub Copilot? You'll talk to a real model. Otherwise the panel falls back to demo mode so the round-trip surface is still visible.\n\n[Show trace log](command:agent-arena.showTraceLog)"
       }
     ],
     "commands": [
@@ -105,6 +107,8 @@
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.8",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

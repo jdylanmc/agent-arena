@@ -55,10 +55,10 @@ describe("FakeSdkAdapter — streamingDeltas", () => {
         const deltas: string[] = [];
         let final = "";
         asFake(session).on<FakeSessionEvent>("assistant.message_delta", (e) => {
-            deltas.push(String(e["chunk"]));
+            deltas.push(String((e["data"] as { deltaContent?: string })?.deltaContent ?? ""));
         });
         asFake(session).on<FakeSessionEvent>("assistant.message", (e) => {
-            final = String(e["text"]);
+            final = String((e["data"] as { content?: string })?.content ?? "");
         });
         await session.send({ prompt: "Reply: pong" } as never);
         fake.triggerStreamingResponse("s1", ["po", "ng"]);
@@ -81,8 +81,9 @@ describe("FakeSdkAdapter — permission allow/deny", () => {
             { toolName: "writeFile", summary: "create scratch.txt", requestId: "r1" },
             "allow",
         );
-        expect(received?.["decision"]).toBe("allow");
-        expect(received?.["toolName"]).toBe("writeFile");
+        const data = received?.["data"] as { decision?: string; toolName?: string } | undefined;
+        expect(data?.decision).toBe("allow");
+        expect(data?.toolName).toBe("writeFile");
     });
 
     it("delivers permission requests with the chosen decision marker (deny)", async () => {
@@ -98,7 +99,8 @@ describe("FakeSdkAdapter — permission allow/deny", () => {
             { toolName: "writeFile", summary: "create scratch.txt", requestId: "r2" },
             "deny",
         );
-        expect(received?.["decision"]).toBe("deny");
+        const data = received?.["data"] as { decision?: string } | undefined;
+        expect(data?.decision).toBe("deny");
     });
 });
 
@@ -109,7 +111,8 @@ describe("FakeSdkAdapter — queued prompts", () => {
         const session = await fake.createSession({ sessionId: "s4" });
         let queued = 0;
         asFake(session).on<FakeSessionEvent>("session.prompt_queued", (e) => {
-            queued = Number(e["queueDepth"]);
+            const data = e["data"] as { queueDepth?: number } | undefined;
+            queued = Number(data?.queueDepth ?? e["queueDepth"]);
         });
         await session.send({ prompt: "first" } as never);
         await session.send({ prompt: "second", mode: "enqueue" } as never);
@@ -170,7 +173,8 @@ describe("FakeSdkAdapter — runtime error", () => {
         const session = await fake.createSession({ sessionId: "s-err" });
         let received = "";
         asFake(session).on<FakeSessionEvent>("session.error", (e) => {
-            received = String(e["error"]);
+            const data = e["data"] as { message?: string } | undefined;
+            received = String(data?.message ?? "");
         });
         fake.triggerRuntimeError("s-err", "model unavailable");
         expect(received).toBe("model unavailable");

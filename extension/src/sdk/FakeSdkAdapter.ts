@@ -147,26 +147,29 @@ export class FakeSdkAdapter implements SdkAdapter {
 
     // ---- Scenario triggers (used by tests; also by demo auto-respond) -------
 
-    /** Emit one or more streaming deltas followed by a final assistant message. */
+    /** Emit one or more streaming deltas followed by a final assistant message.
+     *  Event shape mirrors `@github/copilot-sdk` (per CD-07): each event has
+     *  `{ id, timestamp, parentId, type, data: {...} }` with the
+     *  per-`type` data fields the SDK uses (`deltaContent`, `messageId`,
+     *  `content`). The PrimaryAgentPanel reads `event.data.deltaContent`
+     *  for streaming chunks and `event.data.content` for the final
+     *  message — same code path for the real CopilotSdkAdapter and this
+     *  Fake. */
     triggerStreamingResponse(sessionId: string, chunks: string[]): void {
         const state = this.requireSession(sessionId);
-        const turnId = `turn-${Date.now()}`;
+        const messageId = `msg-${Date.now()}`;
         for (const chunk of chunks) {
-            this.dispatch(state, {
-                type: "assistant.message_delta",
-                sessionId,
-                turnId,
-                chunk,
-            });
+            this.dispatch(state, this.makeEvent("assistant.message_delta", {
+                messageId,
+                deltaContent: chunk,
+            }));
         }
-        this.dispatch(state, {
-            type: "assistant.message",
-            sessionId,
-            turnId,
-            text: chunks.join(""),
-        });
+        this.dispatch(state, this.makeEvent("assistant.message", {
+            messageId,
+            content: chunks.join(""),
+        }));
         state.isRunning = false;
-        this.dispatch(state, { type: "session.idle", sessionId });
+        this.dispatch(state, this.makeEvent("session.idle", {}));
         // Drain queued prompts, if any.
         const next = state.queuedPrompts.shift();
         if (next !== undefined) {
@@ -181,24 +184,21 @@ export class FakeSdkAdapter implements SdkAdapter {
         decision: "allow" | "deny",
     ): void {
         const state = this.requireSession(sessionId);
-        this.dispatch(state, {
-            type: "permission.request",
-            sessionId,
+        this.dispatch(state, this.makeEvent("permission.request", {
             requestId: request.requestId,
             toolName: request.toolName,
             summary: request.summary,
             decision,
-        });
+        }));
     }
 
     /** Surface a runtime error mid-turn. */
     triggerRuntimeError(sessionId: string, errorMessage: string): void {
         const state = this.requireSession(sessionId);
-        this.dispatch(state, {
-            type: "session.error",
-            sessionId,
-            error: errorMessage,
-        });
+        this.dispatch(state, this.makeEvent("session.error", {
+            errorType: "runtime",
+            message: errorMessage,
+        }));
     }
 
     // ---- helpers ------------------------------------------------------------
@@ -209,6 +209,21 @@ export class FakeSdkAdapter implements SdkAdapter {
         if (state.disconnected) throw new Error(`FakeSdkAdapter: session ${sessionId} is disconnected`);
         return state;
     }
+
+    /** Build an SDK-shaped event envelope around the per-type data. Keeps
+     *  the Fake's event shape isomorphic to the real SDK so consumers can
+     *  switch adapters without refactoring their handlers. */
+    private makeEvent(type: string, data: Record<string, unknown>): FakeSessionEvent {
+        return {
+            id: `evt-${this.eventCounter++}`,
+            timestamp: new Date().toISOString(),
+            parentId: null,
+            type,
+            data,
+        };
+    }
+
+    private eventCounter = 0;
 
     private dispatch(state: FakeSessionState, event: FakeSessionEvent): void {
         const listeners = state.listeners.get(event.type);
@@ -227,27 +242,23 @@ export class FakeSdkAdapter implements SdkAdapter {
         if (!this.opts.autoRespond) return;
         const chunks = this.opts.autoRespond(prompt);
         const delay = this.opts.autoRespondChunkDelayMs ?? 30;
-        const turnId = `turn-${Date.now()}`;
+        const messageId = `msg-${Date.now()}`;
         // session.state already moved to running in send(); emit running event.
-        this.dispatch(state, { type: "session.running", sessionId: state.sessionId });
+        this.dispatch(state, this.makeEvent("session.running", {}));
         for (const chunk of chunks) {
             await new Promise<void>((resolve) => setTimeout(resolve, delay));
             if (state.disconnected) return;
-            this.dispatch(state, {
-                type: "assistant.message_delta",
-                sessionId: state.sessionId,
-                turnId,
-                chunk,
-            });
+            this.dispatch(state, this.makeEvent("assistant.message_delta", {
+                messageId,
+                deltaContent: chunk,
+            }));
         }
-        this.dispatch(state, {
-            type: "assistant.message",
-            sessionId: state.sessionId,
-            turnId,
-            text: chunks.join(""),
-        });
+        this.dispatch(state, this.makeEvent("assistant.message", {
+            messageId,
+            content: chunks.join(""),
+        }));
         state.isRunning = false;
-        this.dispatch(state, { type: "session.idle", sessionId: state.sessionId });
+        this.dispatch(state, this.makeEvent("session.idle", {}));
         // Drain queued prompts.
         const next = state.queuedPrompts.shift();
         if (next !== undefined) {
@@ -259,6 +270,7 @@ export class FakeSdkAdapter implements SdkAdapter {
     private makeHandle(state: FakeSessionState): SdkSessionHandle {
         const dispatch = this.dispatch.bind(this);
         const driveAutoRespond = this.driveAutoRespond.bind(this);
+        const makeEvent = this.makeEvent.bind(this);
         const opts = this.opts;
         return {
             get sessionId() {
@@ -269,19 +281,13 @@ export class FakeSdkAdapter implements SdkAdapter {
                 const prompt = sendOpts.prompt ?? "";
                 if (state.isRunning && sendOpts.mode === "enqueue") {
                     state.queuedPrompts.push(prompt);
-                    dispatch(state, {
-                        type: "session.prompt_queued",
-                        sessionId: state.sessionId,
+                    dispatch(state, makeEvent("session.prompt_queued", {
                         queueDepth: state.queuedPrompts.length,
-                    });
+                    }));
                     return;
                 }
                 state.isRunning = true;
-                dispatch(state, {
-                    type: "user.message",
-                    sessionId: state.sessionId,
-                    prompt,
-                });
+                dispatch(state, makeEvent("user.message", { content: prompt }));
                 if (opts.autoRespond) {
                     void driveAutoRespond(state, prompt);
                 }
@@ -305,7 +311,7 @@ export class FakeSdkAdapter implements SdkAdapter {
             },
             async abortCurrentTurn(): Promise<void> {
                 state.isRunning = false;
-                dispatch(state, { type: "session.aborted", sessionId: state.sessionId });
+                dispatch(state, makeEvent("session.aborted", {}));
             },
             async disconnect(): Promise<void> {
                 state.disconnected = true;

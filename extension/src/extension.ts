@@ -3,11 +3,13 @@
  *
  *  Extension host entry point.
  *
- *  Architecture (per CD-06):
- *    - The primary agent runs in a VS Code Pseudoterminal in the integrated
- *      Terminal panel (xterm.js renderer; no bespoke terminal).
+ *  Architecture (per CD-07):
+ *    - The primary agent runs in a `vscode.WebviewPanel` opened in the
+ *      editor area (not the sidebar, not the bottom panel). Renderer is
+ *      `@xterm/xterm` inside a React shell living in `webview-src/`.
  *    - The Activity-Bar view (`agentArenaPrimaryView`) is a TreeView
- *      placeholder with a `viewsWelcome` markdown link to open the terminal.
+ *      welcome with a button that creates/reveals the panel; the panel
+ *      auto-opens on first extension activation per session.
  *    - Yolo state is a status-bar item (per-workspace, per-agent, never
  *      synced across machines per CD-05).
  *    - Permission prompts use VS Code's native modal dialogs.
@@ -17,8 +19,6 @@
  *      try the production `CopilotSdkAdapter` first; if the user is signed
  *      in, use it. Otherwise fall back to the in-memory `FakeSdkAdapter`
  *      demo so the round-trip is still visible.
- *    - The selection is cached for the rest of the extension's lifetime; a
- *      future spec adds explicit re-selection (sign in / sign out flows).
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from "vscode";
@@ -27,14 +27,15 @@ import { EVENT_NAMES } from "./telemetry/eventNames.js";
 import { selectAdapter, type AdapterSelection } from "./sdk/selectAdapter.js";
 import { registerPrimaryView } from "./activate/registerView.js";
 import { registerCommands } from "./activate/registerCommands.js";
-import { PrimaryAgentTerminal } from "./terminal/PrimaryAgentTerminal.js";
+import { PrimaryAgentPanel } from "./panel/PrimaryAgentPanel.js";
 import { YoloStore } from "./state/yolo.js";
 import { YoloStatusBar } from "./state/yoloStatusBar.js";
 
 let emitter: EventEmitter | undefined;
 let yoloStatusBar: YoloStatusBar | undefined;
-let primaryTerminal: vscode.Terminal | undefined;
+let primaryPanel: PrimaryAgentPanel | undefined;
 let adapterSelection: AdapterSelection | undefined;
+let hasAutoOpenedThisSession = false;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const eventsLogPath = vscode.Uri.joinPath(context.logUri, "agent-arena.events.jsonl");
@@ -61,90 +62,94 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // ----- Open Primary Agent command -----
     // Adapter selection is LAZY — happens on first invocation, not on
-    // extension activation. Avoids spawning the Copilot CLI on every VS Code
-    // startup just in case the user might want to use Agent Arena.
-    context.subscriptions.push(
-        vscode.commands.registerCommand("agent-arena.openPrimaryAgent", async () => {
-            // Re-show existing terminal if it's alive.
-            if (primaryTerminal && primaryTerminal.exitStatus === undefined) {
-                primaryTerminal.show();
-                return;
+    // extension activation. Avoids spawning the Copilot CLI on every VS
+    // Code startup just in case the user might want to use Agent Arena.
+    const openPrimary = async (viewColumn?: vscode.ViewColumn): Promise<void> => {
+        try {
+            if (!adapterSelection) {
+                adapterSelection = await vscode.window.withProgress(
+                    {
+                        location: vscode.ProgressLocation.Notification,
+                        title: "Agent Arena: connecting…",
+                        cancellable: false,
+                    },
+                    async () =>
+                        await selectAdapter({
+                            emitter: emitter!,
+                            copilotHome: vscode.Uri.joinPath(
+                                context.globalStorageUri,
+                                ".copilot",
+                            ).fsPath,
+                            telemetryFilePath: vscode.Uri.joinPath(
+                                context.logUri,
+                                "agent-arena.sdk-otel.jsonl",
+                            ).fsPath,
+                            fakeAutoRespond: demoAutoRespond,
+                        }),
+                );
             }
 
-            try {
-                if (!adapterSelection) {
-                    adapterSelection = await vscode.window.withProgress(
-                        {
-                            location: vscode.ProgressLocation.Notification,
-                            title: "Agent Arena: connecting…",
-                            cancellable: false,
-                        },
-                        async () =>
-                            await selectAdapter({
-                                emitter: emitter!,
-                                copilotHome: vscode.Uri.joinPath(
-                                    context.globalStorageUri,
-                                    ".copilot",
-                                ).fsPath,
-                                telemetryFilePath: vscode.Uri.joinPath(
-                                    context.logUri,
-                                    "agent-arena.sdk-otel.jsonl",
-                                ).fsPath,
-                                fakeAutoRespond: demoAutoRespond,
-                            }),
-                    );
-                }
-
-                const sel = adapterSelection;
+            const sel = adapterSelection;
+            if (!primaryPanel) {
                 const workingDirectory =
                     vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-                const pty = new PrimaryAgentTerminal({
+                const panelOpts: ConstructorParameters<typeof PrimaryAgentPanel>[0] = {
+                    extensionUri: context.extensionUri,
                     sdk: sel.adapter,
                     emitter: emitter!,
                     agentId: "primary",
                     workingDirectory,
+                    bannerSubtitle: bannerSubtitleFor(sel),
+                    adapterKind: sel.kind,
                     getYolo: () => yoloStore.get("primary"),
                     setYolo: (next) => {
                         void yoloStore.set("primary", next).then(() => {
                             yoloStatusBar?.refresh();
-                            emitter?.emitNew({
-                                level: "info",
-                                event: EVENT_NAMES.AA_YOLO_TOGGLED,
-                                agent_id: "primary",
-                                payload: { agentId: "primary", enabled: next, source: "terminal" },
-                            });
                         });
                     },
-                    bannerSubtitle: bannerSubtitleFor(sel),
-                });
-                primaryTerminal = vscode.window.createTerminal({
-                    name: "Agent Arena · Primary Agent",
-                    pty,
-                    iconPath: new vscode.ThemeIcon("comment-discussion"),
-                });
-                primaryTerminal.show();
-
-                emitter?.emitNew({
-                    level: "info",
-                    event: EVENT_NAMES.AA_COMMAND_EXECUTED,
-                    agent_id: "primary",
-                    payload: {
-                        command: "agent-arena.openPrimaryAgent",
-                        adapterKind: sel.kind,
-                    },
-                });
-            } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : String(err);
-                emitter?.emitNew({
-                    level: "error",
-                    event: EVENT_NAMES.AA_SDK_CLI_START_FAILED,
-                    agent_id: null,
-                    payload: { error: msg },
-                });
-                void vscode.window.showErrorMessage(`Agent Arena: failed to open — ${msg}`);
+                };
+                if (sel.auth?.login !== undefined) panelOpts.adapterLogin = sel.auth.login;
+                primaryPanel = new PrimaryAgentPanel(panelOpts);
+                context.subscriptions.push(primaryPanel);
             }
-        }),
+            primaryPanel.reveal(viewColumn);
+
+            emitter?.emitNew({
+                level: "info",
+                event: EVENT_NAMES.AA_COMMAND_EXECUTED,
+                agent_id: "primary",
+                payload: {
+                    command: "agent-arena.openPrimaryAgent",
+                    adapterKind: sel.kind,
+                },
+            });
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            emitter?.emitNew({
+                level: "error",
+                event: EVENT_NAMES.AA_SDK_CLI_START_FAILED,
+                agent_id: null,
+                payload: { error: msg },
+            });
+            void vscode.window.showErrorMessage(`Agent Arena: failed to open — ${msg}`);
+        }
+    };
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("agent-arena.openPrimaryAgent", () => openPrimary()),
     );
+
+    // ----- Auto-open on first activation (per CD-07 §3) -----
+    // Subsequent activations of the same VS Code session will not re-open
+    // automatically; the user can re-summon via the activity-bar entry or
+    // the Command Palette. Open beside the welcome page so it stays visible.
+    if (!hasAutoOpenedThisSession) {
+        hasAutoOpenedThisSession = true;
+        // Defer to next tick so the activity-bar registration completes first.
+        setTimeout(() => {
+            void openPrimary(vscode.ViewColumn.Beside);
+        }, 250);
+    }
 
     // ----- Other commands (showTraceLog, harness import/export) -----
     registerCommands({ context, emitter, eventsLogPath });
@@ -158,7 +163,7 @@ export async function deactivate(): Promise<void> {
         payload: {},
     });
     yoloStatusBar?.dispose();
-    primaryTerminal?.dispose();
+    primaryPanel?.dispose();
     if (adapterSelection) {
         try {
             await adapterSelection.adapter.stop();
@@ -209,4 +214,3 @@ function chunked(s: string, chunkSize: number): string[] {
     }
     return chunks.length > 0 ? chunks : [s];
 }
-

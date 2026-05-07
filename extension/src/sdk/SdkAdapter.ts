@@ -12,13 +12,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type {
-    AssistantMessageEvent,
     MessageOptions,
     PermissionHandler,
     ResumeSessionConfig,
     SessionConfig,
-    SessionEvent,
-    SessionLifecycleEvent,
 } from "@github/copilot-sdk";
 
 /** Owns the lifecycle of the underlying CopilotClient. */
@@ -51,12 +48,25 @@ export interface SdkSessionLifecycle {
     disconnect(): Promise<void>;
 }
 
-/** Messaging plane for one SDK session. */
+/** Messaging plane for one SDK session.
+ *
+ *  The `on<E>` signature uses a relaxed `{ type: string }` bound rather
+ *  than the SDK's full event union. Two reasons:
+ *    - Consumers (PrimaryAgentPanel, future agent surfaces) MUST NOT
+ *      import `@github/copilot-sdk` runtime types per the
+ *      no-restricted-imports rule, so they can't supply a SessionEvent
+ *      narrowing type argument.
+ *    - The wrapping in CopilotSdkAdapter / FakeSdkAdapter already
+ *      bridges the strict SDK shape into our adapter contract; the
+ *      consumer's job is to read `event.data.<field>` as needed.
+ *  This is more — not less — ISP-conformant: consumers depend only on
+ *  the property they actually read (`type`), not the full SDK union.
+ */
 export interface SdkSessionMessaging {
     send(opts: MessageOptions & { mode?: "enqueue" }): Promise<void>;
 
-    on<E extends SessionEvent | SessionLifecycleEvent | AssistantMessageEvent>(
-        eventType: E extends { type: infer T } ? T & string : never,
+    on<E extends { type: string }>(
+        eventType: string,
         handler: (event: E) => void | Promise<void>,
     ): { dispose(): void };
 

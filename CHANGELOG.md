@@ -20,6 +20,31 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **CD-07 implementation — primary agent surface = WebviewPanel + bespoke
+  xterm.js terminal**: replaces the CD-06 Pseudoterminal architecture
+  (which proved too narrow for planned customizations and hides the
+  rendering layer behind VS Code's Terminal panel). The primary agent now
+  opens via `vscode.window.createWebviewPanel` in the editor area
+  (`viewColumn=Active`, `retainContextWhenHidden=true`,
+  `enableScripts=true`, `localResourceRoots=dist/webview`) — splittable,
+  maximizable, dragable like any editor tab. Renderer is `@xterm/xterm`
+  v0.11.0 + `@xterm/addon-fit` inside a React shell at `webview-src/`.
+  CSP is locked on every render (`default-src 'none'`; nonce-gated
+  scripts; `'unsafe-inline'` styles only). Activity-bar **A** icon stays
+  as the auxiliary entry; on first activation per session the panel
+  auto-opens beside the welcome page. The earlier
+  `src/terminal/PrimaryAgentTerminal.ts` and the React chat-style
+  components (`MessageList`, `PromptInput`, `StatusHeader`) are deleted
+  as superseded; replaced by `src/panel/PrimaryAgentPanel.ts` (host
+  orchestration), `webview-src/components/XtermTerminal.tsx` (renderer),
+  and `webview-src/lib/terminalController.ts` (input buffer, ↑/↓ history,
+  CSI parsing, slash commands). New `agent.bootstrap` outbound message
+  type carries cwd + adapter kind/login + yolo state to the React shell
+  on first paint. The FakeSdkAdapter and adapter-contract tests were
+  updated to emit SDK-shaped events (`{ type, data: {...} }` with
+  `deltaContent`/`content`) so a single panel-side handler works against
+  both the real and fake adapters. — copilot(developer:opus-4.7)
+
 - **Production `CopilotSdkAdapter` + runtime selector** (T035):
   `extension/src/sdk/CopilotSdkAdapter.ts` is now the SOLE permitted
   importer of `@github/copilot-sdk` runtime values; it implements the
