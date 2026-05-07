@@ -173,7 +173,40 @@ Principle II violation and the deputy will flag them.
 
 ### Changed
 
-- **P-1 self-application carve-out** (resolves #6). Added a
+- **Migrated `deputy` and `solid-snake` agents to the directive +
+  persona + composition layout.** The legacy single-file
+  `agents/deputy/persona.md` and `agents/solid-snake/persona.md` have
+  been deleted; both agents now use the same three-part layout as
+  GLaDOS-QA. The deputy directive is extracted to
+  `agents/directives/deputy.md` (constitution enforcement, the twelve
+  numbered checkpoints across Principles I–VI plus Wiki, Changelog,
+  Secrets, Sync Impact, Prohibitions, and EI clauses, voice-agnostic).
+  The SOLID directive is extracted to `agents/directives/solid.md`
+  (the five SOLID object-oriented design principles, the
+  `SOLID` / `NOT-SOLID` two-verdict surface, the PR review loop,
+  voice-agnostic). New compositions live at `agents/deputy/agent.md`
+  and `agents/solid-snake/agent.md`. The `agents/README.md`
+  *Two layouts (both supported)* section is removed; the single
+  three-part layout is now canonical. — copilot(developer:opus-4.7)
+- **Added Andy Griffith and Barney Fife personas** under
+  `agents/personas/` for interchangeability. The `deputy` composition
+  is corrected to pair the deputy directive with the **Barney Fife**
+  persona — in *The Andy Griffith Show* canon, Barney Fife is the
+  Deputy and Andy Taylor is the Sheriff, so the legacy file's use of
+  the Andy Griffith voice for the deputy role was a mis-cast. The
+  Andy Griffith persona is preserved in this repository (with its
+  casting note flagging that it is intended for a future
+  sheriff-shaped directive, not the deputy directive). The directive
+  / persona split makes either pairing a one-line change in the
+  composition file. — copilot(developer:opus-4.7)
+- **Added Solid Snake persona** under
+  `agents/personas/solid-snake.md`. The `solid-snake` composition now
+  pairs the SOLID directive with the Solid Snake codec-style
+  tactical-reconnaissance register. The persona file explicitly
+  carries a *no source-canon catchphrases* rule (no "Snake?", no
+  "Colonel,", no "kept you waiting") to keep the homage tasteful and
+  free of copyright-adjacent dialogue lifts. — copilot(developer:opus-4.7)
+- **P-1 self-application carve-out** (resolves #6).Added a
   *Self-application exception* clause to P-1 in
   `.specify/memory/constitution.md`. The literal instruction-override
   probe that appears in P-1's own teaching prose and `❌` code example
