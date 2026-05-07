@@ -20,6 +20,116 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **CD-08 — prototype-based UI shell**: the React webview now matches
+  the layout in [`prototype/swarm-primary.png`](prototype/swarm-primary.png):
+  top brand bar, `Swarm | Workflow` tabs, left sidebar with a
+  `PRIMARY AGENT` section (single entry — *Main Developer*), per-agent
+  header with avatar + status + settings gear, xterm terminal, and a
+  bottom command-input row with a paper-airplane send button. The
+  `BACKGROUND AGENTS` section and `+ New Agent` CTA from the prototype
+  are intentionally not rendered in this scaffold (deferred to a
+  future spec); the visual contract is locked so they slot in cleanly
+  when they ship. — copilot(developer:opus-4.7)
+
+- **CD-09 — EI-2 harness unload semantics**: pins down a three-state
+  unload protocol. `loadHarness` copies session directories into a
+  per-harness residency root under `${context.globalStorageUri}/harnesses/<id>/`
+  and redirects `COPILOT_HOME` there; `unloadHarness` drains in-flight
+  sessions and recursively deletes the residency root; `load(B)` after
+  `load(A) + unload(A)` starts a fresh client. Resolves the deputy's
+  outstanding ⚠ from
+  [`agents/deputy/reports/20260506-164205-deputy-report.md`](agents/deputy/reports/20260506-164205-deputy-report.md).
+  — copilot(developer:opus-4.7)
+
+- **FR-026 path correction**: harness fixture moved from
+  `extension/tests/fixtures/` to `extension/tests/harnesses/` per
+  `constitution.md:584-588`. Resolves the deputy's borderline ❌
+  from the same report. — copilot(developer:opus-4.7)
+
+- **Permission policy seam (T036, T038–T041)**: extracts the inline
+  yolo + modal-prompt logic from `PrimaryAgentPanel` into three
+  files. `YoloPolicy` always allows + emits the canonical event with
+  `source: "yolo"`. `PromptUserPolicy` uses VS Code's modal dialog;
+  user-dismissed modals are denied as a safe default.
+  `DefaultPolicyResolver` re-consults `getYolo` on every tool
+  invocation so a yolo toggle takes effect immediately (FR-018) without
+  restarting the session. The `PrimaryAgentPanel.onPermissionRequest`
+  shim translates the typed `PermissionDecision` into the SDK's
+  `approved`/`denied` shape — no call-site changes required when a
+  future per-tool policy plugs into the resolver (FR-019 / R-06).
+  — copilot(developer:opus-4.7)
+
+- **Copilot CLI startup fix in VS Code's Electron host**: explicitly
+  resolves `cliPath` to the OS-specific binary at
+  `node_modules/@github/copilot-<platform>-<arch>/copilot[.exe]` so the
+  SDK skips its `getNodeExecPath()` fallback (which would otherwise
+  spawn `Code.exe` instead of `node`, failing immediately). Surfaces
+  in the panel banner as *connected to GitHub Copilot as `<your-login>`*
+  when the user is signed in. — copilot(developer:opus-4.7)
+
+- **Wiki bootstrap (FR-027–031)**: established the project's durable
+  knowledge base under `wiki/`. Synthesis pages
+  [`wiki/sources/copilot-sdk.md`](wiki/sources/copilot-sdk.md) (FR-027)
+  and [`wiki/sources/vscode-extensions-api.md`](wiki/sources/vscode-extensions-api.md)
+  (FR-028) cover architecture, key APIs, auth priority order,
+  observability hooks, and known constraints (the Electron-host
+  `process.execPath` gotcha, ESM-only SDK, missing abort-turn
+  primitive). 10 immutable source-pointer files per source under
+  `wiki/raw/<source>/` (FR-029). [`wiki/glossary/bot-fight.md`](wiki/glossary/bot-fight.md)
+  records the historical alias (FR-031). [`wiki/index.md`](wiki/index.md)
+  cross-links every page (FR-030). [`wiki/AGENTS.md`](wiki/AGENTS.md)
+  documents the editing contract for any future agent or human.
+  — copilot(developer:opus-4.7)
+
+- **CI workflow (FR-032/033/034)**:
+  [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on
+  `ubuntu-latest` and `windows-latest`, doing
+  `npm ci → typecheck → lint → vitest → integration (Linux only via
+  xvfb) → build → vsce package`, and uploads the `.vsix` as a build
+  artifact. Live-SDK verification stays manual per FR-033.
+  — copilot(developer:opus-4.7)
+
+- **README live-SDK verification (FR-035)**:
+  [`extension/README.md`](extension/README.md) walks through install,
+  build, run, sign-in to GitHub Copilot, the `Reply: pong` round-trip,
+  trace-log inspection, and evidence to attach to the verification PR.
+  Layout reflects the actual `src/` and `webview-src/` trees post-CD-07
+  and -CD-08. — copilot(developer:opus-4.7)
+
+- **US-2 unit test coverage (T065–T072 partial)**: 19 new tests across
+  4 files — `YoloPolicy`, `PromptUserPolicy` (allow/deny/dismissed paths
+  + event-emission ordering), `DefaultPolicyResolver` (the
+  re-consult-getYolo-on-every-call invariant from FR-018), and
+  `YoloStore` (per-agent isolation, default-OFF, `agentArena.yoloMode.<id>`
+  key per CD-05). 110/110 tests passing. The remaining T067/T068
+  workspace-reload integration tests are deferred — they require the
+  yolo banner from CD-05 §3 which lands in a follow-up.
+  — copilot(developer:opus-4.7)
+
+- **Integration test scaffold (T049)**:
+  [`extension/test/integration/activation.test.ts`](extension/test/integration/activation.test.ts)
+  fires up a real VS Code instance via `@vscode/test-electron` and
+  asserts: extension discoverable by id, `activate()` resolves without
+  throwing, all five contributed commands are registered. CI runs
+  these on Linux via `xvfb-run`. T050–T053 (view rendering, end-to-end
+  round-trip, persistence, streaming aggregator) are scaffolded for
+  but not yet authored — they follow once T071 (the `yolo.set` envelope
+  wiring) lands. — copilot(developer:opus-4.7)
+
+- **GitHub Action tracking (issue #12)**: filed
+  [github.com/jdylanmc/agent-arena/issues/12](https://github.com/jdylanmc/agent-arena/issues/12)
+  per the SOLID SNAKE persona's open question #1 — auto-invoking
+  deputy + SOLID-snake on PR events requires LLM-API-key infrastructure
+  not yet available. Tracked for a follow-up spec; the bots remain
+  human-invoked in the meantime (per their read-only contract).
+  — copilot(developer:opus-4.7)
+
+- **SOLID-snake persona example cleanup**: dropped `-xhigh` suffix from
+  the persona's example identities at
+  [`agents/solid-snake/persona.md:49`](agents/solid-snake/persona.md)
+  per the persona-consistency note in the SOLID-snake report
+  (L99-105). — copilot(developer:opus-4.7)
+
 - **CD-07 implementation — primary agent surface = WebviewPanel + bespoke
   xterm.js terminal**: replaces the CD-06 Pseudoterminal architecture
   (which proved too narrow for planned customizations and hides the
