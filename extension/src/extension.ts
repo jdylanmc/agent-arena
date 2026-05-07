@@ -3,22 +3,28 @@
  *
  *  Extension host entry point.
  *
- *  Architecture (per CD-07):
+ *  Architecture (per CD-07 / CD-08 / CD-10 / CD-11 / CD-12):
  *    - The primary agent runs in a `vscode.WebviewPanel` opened in the
- *      editor area (not the sidebar, not the bottom panel). Renderer is
- *      `@xterm/xterm` inside a React shell living in `webview-src/`.
- *    - The Activity-Bar view (`agentArenaPrimaryView`) is a TreeView
- *      welcome with a button that creates/reveals the panel; the panel
- *      auto-opens on first extension activation per session.
- *    - Yolo state is a status-bar item (per-workspace, per-agent, never
- *      synced across machines per CD-05).
- *    - Permission prompts use VS Code's native modal dialogs.
+ *      editor area, rendered by `@xterm/xterm` inside a React shell.
+ *    - The Activity Bar `agentArenaPrimaryView` TreeView is populated
+ *      with one row per registered Agent (currently just *Main
+ *      Developer*). Clicking a row fires `agent-arena.openAgent`.
+ *    - Agent state lives in the `AgentRegistry` (the keyed map of
+ *      Agents). Each Agent owns its SDK session, transcript buffer,
+ *      status, and yolo binding. Closing the panel does NOT dispose
+ *      the agent (CD-11 §6); re-opening replays the in-flight transcript.
+ *    - `AgentPanelManager` maps `agentId → AgentPanel`. `open(agentId)`
+ *      reveals the existing panel if alive, otherwise creates a new one.
+ *    - Yolo state surfaces as a status-bar item (CD-05) and via the
+ *      `/yolo` slash command in the terminal.
+ *    - Permission prompts use VS Code's modal dialog (CD-07 §6 +
+ *      `PromptUserPolicy`).
  *
- *  SDK selection (per T035 + selectAdapter.ts):
- *    - On first `agent-arena.openPrimaryAgent`, lazily run `selectAdapter()`:
- *      try the production `CopilotSdkAdapter` first; if the user is signed
- *      in, use it. Otherwise fall back to the in-memory `FakeSdkAdapter`
- *      demo so the round-trip is still visible.
+ *  SDK selection:
+ *    - On first activation we lazy-pick the SDK adapter via
+ *      `selectAdapter()`: try the production `CopilotSdkAdapter`; fall
+ *      back to `FakeSdkAdapter` if the user is not signed in or the CLI
+ *      fails to start. The chosen adapter feeds every Agent.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from "vscode";
@@ -27,19 +33,31 @@ import { EVENT_NAMES } from "./telemetry/eventNames.js";
 import { selectAdapter, type AdapterSelection } from "./sdk/selectAdapter.js";
 import { registerPrimaryView } from "./activate/registerView.js";
 import { registerCommands } from "./activate/registerCommands.js";
-import { PrimaryAgentPanel } from "./panel/PrimaryAgentPanel.js";
+import { Agent } from "./state/Agent.js";
+import { AgentRegistry } from "./state/AgentRegistry.js";
+import { AgentPanelManager } from "./panel/AgentPanelManager.js";
 import { YoloStore } from "./state/yolo.js";
 import { YoloStatusBar } from "./state/yoloStatusBar.js";
 import { DefaultPolicyResolver } from "./permission/DefaultPolicyResolver.js";
 
-let emitter: EventEmitter | undefined;
-let yoloStatusBar: YoloStatusBar | undefined;
-let primaryPanel: PrimaryAgentPanel | undefined;
-let adapterSelection: AdapterSelection | undefined;
+const PRIMARY_AGENT_ID = "primary";
+const PRIMARY_AGENT_DISPLAY_NAME = "Main Developer";
+
+interface ActivationState {
+    emitter: EventEmitter;
+    yoloStore: YoloStore;
+    yoloStatusBar: YoloStatusBar;
+    registry: AgentRegistry;
+    panelManager: AgentPanelManager;
+    adapterSelection: AdapterSelection | undefined;
+    primaryAgent: Agent | undefined;
+}
+
+let activation: ActivationState | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const eventsLogPath = vscode.Uri.joinPath(context.logUri, "agent-arena.events.jsonl");
-    emitter = new EventEmitter({ filePath: eventsLogPath.fsPath });
+    const emitter = new EventEmitter({ filePath: eventsLogPath.fsPath });
 
     emitter.emitNew({
         level: "info",
@@ -52,129 +70,177 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         },
     });
 
-    // ----- Yolo state (CD-05) -----
     const yoloStore = new YoloStore(context.workspaceState);
-    yoloStatusBar = new YoloStatusBar(yoloStore, emitter, "primary");
+    const yoloStatusBar = new YoloStatusBar(yoloStore, emitter, PRIMARY_AGENT_ID);
     context.subscriptions.push(yoloStatusBar);
 
-    // ----- Activity-bar placeholder view -----
-    registerPrimaryView(context);
+    const registry = new AgentRegistry();
+    const panelManager = new AgentPanelManager({
+        registry,
+        extensionUri: context.extensionUri,
+        emitter,
+    });
+    context.subscriptions.push(panelManager);
 
-    // ----- Open Primary Agent command -----
-    // Adapter selection is LAZY — happens on first invocation, not on
-    // extension activation. Avoids spawning the Copilot CLI on every VS
-    // Code startup just in case the user might want to use Agent Arena.
-    const openPrimary = async (viewColumn?: vscode.ViewColumn): Promise<void> => {
-        try {
-            if (!adapterSelection) {
-                adapterSelection = await vscode.window.withProgress(
-                    {
-                        location: vscode.ProgressLocation.Notification,
-                        title: "Agent Arena: connecting…",
-                        cancellable: false,
-                    },
-                    async () =>
-                        await selectAdapter({
-                            emitter: emitter!,
-                            extensionPath: context.extensionUri.fsPath,
-                            copilotHome: vscode.Uri.joinPath(
-                                context.globalStorageUri,
-                                ".copilot",
-                            ).fsPath,
-                            telemetryFilePath: vscode.Uri.joinPath(
-                                context.logUri,
-                                "agent-arena.sdk-otel.jsonl",
-                            ).fsPath,
-                            fakeAutoRespond: demoAutoRespond,
-                        }),
-                );
-            }
-
-            const sel = adapterSelection;
-            if (!primaryPanel) {
-                const workingDirectory =
-                    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
-                const policyResolver = new DefaultPolicyResolver({
-                    emitter: emitter!,
-                    getYolo: (agentId) => yoloStore.get(agentId),
-                });
-                const panelOpts: ConstructorParameters<typeof PrimaryAgentPanel>[0] = {
-                    extensionUri: context.extensionUri,
-                    sdk: sel.adapter,
-                    emitter: emitter!,
-                    agentId: "primary",
-                    workingDirectory,
-                    bannerSubtitle: bannerSubtitleFor(sel),
-                    adapterKind: sel.kind,
-                    getYolo: () => yoloStore.get("primary"),
-                    setYolo: (next) => {
-                        void yoloStore.set("primary", next).then(() => {
-                            yoloStatusBar?.refresh();
-                        });
-                    },
-                    policyResolver,
-                };
-                if (sel.auth?.login !== undefined) panelOpts.adapterLogin = sel.auth.login;
-                primaryPanel = new PrimaryAgentPanel(panelOpts);
-                context.subscriptions.push(primaryPanel);
-            }
-            primaryPanel.reveal(viewColumn);
-
-            emitter?.emitNew({
-                level: "info",
-                event: EVENT_NAMES.AA_COMMAND_EXECUTED,
-                agent_id: "primary",
-                payload: {
-                    command: "agent-arena.openPrimaryAgent",
-                    adapterKind: sel.kind,
-                },
-            });
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            emitter?.emitNew({
-                level: "error",
-                event: EVENT_NAMES.AA_SDK_CLI_START_FAILED,
-                agent_id: null,
-                payload: { error: msg },
-            });
-            void vscode.window.showErrorMessage(`Agent Arena: failed to open — ${msg}`);
-        }
+    activation = {
+        emitter,
+        yoloStore,
+        yoloStatusBar,
+        registry,
+        panelManager,
+        adapterSelection: undefined,
+        primaryAgent: undefined,
     };
 
+    // ----- Activity Bar TreeView -----
+    // Visibility-driven open: the TreeView's onDidChangeVisibility(true)
+    // forwards into agent-arena.openAgent("primary") so clicking the A
+    // icon opens the panel. No `onStartupFinished` activation event,
+    // no auto-open setTimeout.
+    context.subscriptions.push(registerPrimaryView({ context, registry }));
+
+    // ----- Commands -----
+    // agent-arena.openAgent is the canonical command (CD-11 §7). The
+    // Command Palette uses it directly. agent-arena.openPrimaryAgent
+    // stays as backwards-compatible sugar.
     context.subscriptions.push(
-        vscode.commands.registerCommand("agent-arena.openPrimaryAgent", () => openPrimary()),
+        vscode.commands.registerCommand(
+            "agent-arena.openAgent",
+            (agentId: string) => openAgent(context, agentId),
+        ),
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand("agent-arena.openPrimaryAgent", () =>
+            openAgent(context, PRIMARY_AGENT_ID),
+        ),
     );
 
-    // Per CD-12 §8 + rubber-duck A4: no `onStartupFinished` activation, no
-    // auto-open on activate. The Activity-Bar TreeView's
-    // `onDidChangeVisibility` (registered in registerView.ts) is the SOLE
-    // trigger that opens the panel — that's how the user invokes us.
-
-    // ----- Other commands (showTraceLog, harness import/export) -----
+    // ----- Other commands (showTraceLog, harness import/export stubs) -----
     registerCommands({ context, emitter, eventsLogPath });
 }
 
 export async function deactivate(): Promise<void> {
-    emitter?.emitNew({
+    if (!activation) return;
+    activation.emitter.emitNew({
         level: "info",
         event: EVENT_NAMES.AA_EXTENSION_DEACTIVATE,
         agent_id: null,
         payload: {},
     });
-    yoloStatusBar?.dispose();
-    primaryPanel?.dispose();
-    if (adapterSelection) {
+    activation.panelManager.dispose();
+    try {
+        await activation.registry.dispose();
+    } catch {
+        /* swallow — extension is shutting down */
+    }
+    activation.yoloStatusBar.dispose();
+    if (activation.adapterSelection) {
         try {
-            await adapterSelection.adapter.stop();
+            await activation.adapterSelection.adapter.stop();
         } catch {
-            /* swallow — extension is shutting down */
+            /* ignore */
         }
-        adapterSelection = undefined;
+    }
+    activation = undefined;
+}
+
+async function openAgent(
+    context: vscode.ExtensionContext,
+    agentId: string,
+): Promise<void> {
+    if (!activation) return;
+    if (agentId !== PRIMARY_AGENT_ID) {
+        // Future specs add background agents; this scaffold only knows
+        // about "primary." Anything else is a typo / future-spec preview.
+        void vscode.window.showErrorMessage(
+            `Agent Arena: no agent registered under id "${agentId}". Only "${PRIMARY_AGENT_ID}" is available in this scaffold.`,
+        );
+        return;
+    }
+    try {
+        await ensurePrimaryAgent(context);
+        activation.panelManager.open(agentId);
+        activation.emitter.emitNew({
+            level: "info",
+            event: EVENT_NAMES.AA_COMMAND_EXECUTED,
+            agent_id: agentId,
+            payload: { command: "agent-arena.openAgent", agentId },
+        });
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        activation.emitter.emitNew({
+            level: "error",
+            event: EVENT_NAMES.AA_SDK_CLI_START_FAILED,
+            agent_id: null,
+            payload: { error: msg },
+        });
+        void vscode.window.showErrorMessage(`Agent Arena: failed to open — ${msg}`);
     }
 }
 
-/** Demo-mode auto-respond. The FakeSdkAdapter calls this when the user is
- *  not signed in to Copilot. Production CopilotSdkAdapter ignores this. */
+async function ensurePrimaryAgent(context: vscode.ExtensionContext): Promise<void> {
+    if (!activation) throw new Error("activation state missing");
+    if (activation.primaryAgent) return;
+
+    if (!activation.adapterSelection) {
+        activation.adapterSelection = await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: "Agent Arena: connecting…",
+                cancellable: false,
+            },
+            async () =>
+                await selectAdapter({
+                    emitter: activation!.emitter,
+                    extensionPath: context.extensionUri.fsPath,
+                    copilotHome: vscode.Uri.joinPath(
+                        context.globalStorageUri,
+                        ".copilot",
+                    ).fsPath,
+                    telemetryFilePath: vscode.Uri.joinPath(
+                        context.logUri,
+                        "agent-arena.sdk-otel.jsonl",
+                    ).fsPath,
+                    fakeAutoRespond: demoAutoRespond,
+                }),
+        );
+    }
+
+    const sel = activation.adapterSelection;
+    const workingDirectory =
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+
+    const policyResolver = new DefaultPolicyResolver({
+        emitter: activation.emitter,
+        getYolo: (id) => activation!.yoloStore.get(id),
+    });
+
+    const agentOpts: ConstructorParameters<typeof Agent>[0] = {
+        id: PRIMARY_AGENT_ID,
+        displayName: PRIMARY_AGENT_DISPLAY_NAME,
+        sdk: sel.adapter,
+        workingDirectory,
+        bannerSubtitle: bannerSubtitleFor(sel),
+        adapterKind: sel.kind,
+        yoloStore: activation.yoloStore,
+        policyResolver,
+        emitter: activation.emitter,
+    };
+    if (sel.auth?.login !== undefined) agentOpts.adapterLogin = sel.auth.login;
+
+    const agent = new Agent(agentOpts);
+    activation.primaryAgent = agent;
+    activation.registry.register(agent);
+
+    // When yolo state changes externally (status-bar click, slash
+    // command), refresh the agent snapshot so TreeView + panel update.
+    // YoloStatusBar already calls yoloStore.set, which the agent's own
+    // setYolo can trigger; the snapshot fire happens inside Agent.
+}
+
+/** Demo-mode auto-respond. The FakeSdkAdapter calls this when the user
+ *  is not signed in to Copilot. Production CopilotSdkAdapter ignores
+ *  this. */
 function demoAutoRespond(prompt: string): string[] {
     const trimmed = prompt.trim().toLowerCase();
     if (trimmed.includes("pong")) return ["pong"];

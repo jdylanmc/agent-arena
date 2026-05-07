@@ -1,13 +1,28 @@
+/*---------------------------------------------------------------------------------------------
+ *  webview-src/App.tsx
+ *
+ *  React shell for one Agent panel (per CD-11 §5). Renders only:
+ *    - AgentPaneHeader (avatar + name + status + cwd + adapter status + gear)
+ *    - XtermTerminal (the bespoke terminal renderer from CD-07)
+ *    - CommandInput (bottom send-on-Enter input row)
+ *
+ *  No tabs, no in-panel sidebar, no top brand bar — those moved to the
+ *  Activity Bar TreeView (CD-11 §1).
+ *
+ *  On bootstrap the host sends `agent.bootstrap` with a transcript array
+ *  for replay (CD-11 §6 hybrid). For each turn, we replay the chunks
+ *  into xterm followed by the final-message marker (CRLF), so the user
+ *  sees the conversation in the same shape it had before the panel was
+ *  closed. After replay completes, normal streaming resumes.
+ *--------------------------------------------------------------------------------------------*/
+
 import { useEffect, useRef, useState } from "react";
 import { bus } from "./protocol/messageBus.js";
 import { XtermTerminal, type XtermApi } from "./components/XtermTerminal.js";
 import { TerminalController } from "./lib/terminalController.js";
-import { AppHeader } from "./components/AppHeader.js";
-import { TabsRow, type TabId } from "./components/TabsRow.js";
-import { Sidebar, type AgentStatus, type SidebarAgent } from "./components/Sidebar.js";
 import { AgentPaneHeader } from "./components/AgentPaneHeader.js";
 import { CommandInput } from "./components/CommandInput.js";
-import { WorkflowStub } from "./components/WorkflowStub.js";
+import type { AgentStatus } from "./components/Sidebar-types.js";
 
 interface AdapterStatus {
     adapterKind: "copilot" | "fake-demo";
@@ -23,7 +38,6 @@ const PRIMARY_AGENT_DISPLAY_NAME = "Main Developer";
 export function App(): JSX.Element {
     const [status, setStatus] = useState<AdapterStatus | null>(null);
     const [sessionStatus, setSessionStatus] = useState<AgentStatus>("connecting");
-    const [activeTab, setActiveTab] = useState<TabId>("swarm");
     const xtermRef = useRef<XtermApi>(null);
     const controllerRef = useRef<TerminalController | null>(null);
 
@@ -53,6 +67,12 @@ export function App(): JSX.Element {
             setStatus(info);
             setSessionStatus("idle");
             controller.setBootstrap(info);
+            // CD-11 §6 transcript replay: write each prior turn's chunks
+            // into xterm before unblocking input. The controller renders
+            // its prompt after replay completes.
+            if (payload.transcript && payload.transcript.length > 0) {
+                controller.replayTranscript(payload.transcript);
+            }
             xtermRef.current?.focus();
         });
 
@@ -63,7 +83,13 @@ export function App(): JSX.Element {
             controller.onAssistantFinal();
         });
         const offState = bus.on("session.state", (payload) => {
-            setSessionStatus(payload.status === "running" ? "running" : "idle");
+            setSessionStatus(
+                payload.status === "running"
+                    ? "running"
+                    : payload.status === "error"
+                      ? "error"
+                      : "idle",
+            );
             if (payload.status === "idle") controller.onSessionIdle();
         });
         const offError = bus.on("error", (payload) => {
@@ -84,59 +110,34 @@ export function App(): JSX.Element {
     }, []);
 
     return (
-        <div className="flex h-screen w-screen flex-col bg-[#1e1e1e] text-[#d4d4d4]">
-            <AppHeader />
-            <TabsRow active={activeTab} onChange={setActiveTab} />
-            <div className="flex min-h-0 flex-1">
-                <Sidebar
-                    primary={primarySidebarEntry(sessionStatus)}
-                    selectedAgentId={PRIMARY_AGENT_ID}
-                    onSelect={() => {
-                        /* only one agent in this scaffold */
-                    }}
+        <div
+            className="flex h-screen w-screen flex-col"
+            style={{
+                background: "var(--vscode-editor-background, #1e1e1e)",
+                color: "var(--vscode-editor-foreground, #d4d4d4)",
+            }}
+        >
+            <AgentPaneHeader
+                agentName={PRIMARY_AGENT_DISPLAY_NAME}
+                status={sessionStatus}
+                workingDirectory={status?.workingDirectory ?? "…"}
+                bannerSubtitle={status?.bannerSubtitle ?? "connecting"}
+                onGearClick={() => {
+                    // CD-08 §6 — gear is non-functional in this scaffold;
+                    // the canonical-event hookup lands when the agent-
+                    // settings spec ships.
+                }}
+            />
+            <div className="min-h-0 flex-1 px-2 py-1">
+                <XtermTerminal
+                    ref={xtermRef}
+                    onData={(data) => controllerRef.current?.handleInput(data)}
                 />
-                <main className="flex min-h-0 flex-1 flex-col bg-[#1e1e1e]">
-                    {activeTab === "swarm" ? (
-                        <>
-                            <AgentPaneHeader
-                                agentName={PRIMARY_AGENT_DISPLAY_NAME}
-                                status={sessionStatus}
-                                workingDirectory={status?.workingDirectory ?? "…"}
-                                bannerSubtitle={status?.bannerSubtitle ?? "connecting"}
-                                onGearClick={() => {
-                                    // CD-08 §4 — gear is non-functional in this
-                                    // scaffold; the canonical-event hookup lands
-                                    // when the agent-settings spec ships.
-                                }}
-                            />
-                            <div className="min-h-0 flex-1 px-2 py-1">
-                                <XtermTerminal
-                                    ref={xtermRef}
-                                    onData={(data) =>
-                                        controllerRef.current?.handleInput(data)
-                                    }
-                                />
-                            </div>
-                            <CommandInput
-                                onSubmit={(text) =>
-                                    controllerRef.current?.submitFromInputBox(text)
-                                }
-                                disabled={sessionStatus === "connecting"}
-                            />
-                        </>
-                    ) : (
-                        <WorkflowStub />
-                    )}
-                </main>
             </div>
+            <CommandInput
+                onSubmit={(text) => controllerRef.current?.submitFromInputBox(text)}
+                disabled={sessionStatus === "connecting"}
+            />
         </div>
     );
-}
-
-function primarySidebarEntry(status: AgentStatus): SidebarAgent {
-    return {
-        id: PRIMARY_AGENT_ID,
-        displayName: PRIMARY_AGENT_DISPLAY_NAME,
-        status,
-    };
 }

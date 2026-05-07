@@ -2,9 +2,9 @@
  *  src/state/yoloStatusBar.ts
  *
  *  VS Code status bar item showing the primary agent's yolo state. Click to
- *  toggle. Updates from the Pseudoterminal's /yolo command, the future
- *  webview UI, or this status bar all flow through the same YoloStore so
- *  every surface reflects the same state.
+ *  toggle. Subscribes to `YoloStore.onDidChange` so external mutations (the
+ *  Agent's `setYolo`, slash commands inside the panel, future control
+ *  surfaces) refresh the status bar in real time.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from "vscode";
@@ -33,20 +33,24 @@ export class YoloStatusBar implements vscode.Disposable {
             vscode.commands.registerCommand(TOGGLE_COMMAND, async () => {
                 const next = !this.store.get(this.agentId);
                 await this.store.set(this.agentId, next);
-                this.refresh();
                 this.emitter.emitNew({
                     level: "info",
                     event: EVENT_NAMES.AA_YOLO_TOGGLED,
                     agent_id: this.agentId,
                     payload: { agentId: this.agentId, enabled: next, source: "status-bar" },
                 });
+                // Refresh handled via onDidChange subscription below.
+            }),
+        );
+
+        this.disposables.push(
+            this.store.onDidChange((event) => {
+                if (event.agentId === this.agentId) this.refresh();
             }),
         );
     }
 
-    /** Re-render the status bar from the current persisted state. The
-     *  Pseudoterminal calls this after a /yolo command to push the change
-     *  into the status bar without going through the toggle command. */
+    /** Re-render the status bar from the current persisted state. */
     refresh(): void {
         const enabled = this.store.get(this.agentId);
         if (enabled) {

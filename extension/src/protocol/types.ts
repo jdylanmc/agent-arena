@@ -69,7 +69,8 @@ export const ErrorMessageSchema = z.object({
 /** Initial bootstrap payload sent by the host immediately after the
  *  webview reports itself ready. Carries everything the React shell needs
  *  to render its banner (cwd, adapter kind/login, yolo state) without a
- *  separate round-trip per field. Per CD-07. */
+ *  separate round-trip per field, plus the transcript for replay on
+ *  panel re-open (per CD-11 §6). */
 export const AgentBootstrapSchema = z.object({
     agentId: z.string().min(1),
     workingDirectory: z.string().min(1),
@@ -77,6 +78,16 @@ export const AgentBootstrapSchema = z.object({
     adapterLogin: z.string().optional(),
     bannerSubtitle: z.string().min(1),
     yoloEnabled: z.boolean(),
+    transcript: z
+        .array(
+            z.object({
+                turnId: z.string().min(1),
+                chunks: z.array(z.string()),
+                final: z.string().optional(),
+            }),
+        )
+        .optional(),
+    currentTurnId: z.string().optional(),
 });
 
 // =============================================================================

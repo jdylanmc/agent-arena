@@ -2,10 +2,34 @@
  *  test/unit/state/yolo.test.ts
  *
  *  Unit tests for YoloStore — the workspaceState-backed yolo state
- *  (CD-05). Per-agent, defaults to OFF, never synced.
+ *  (CD-05). Per-agent, defaults to OFF, never synced. Now also fires
+ *  onDidChange events (per CD-11 §7) so external surfaces — TreeView,
+ *  status bar, agent — refresh in sync.
  *--------------------------------------------------------------------------------------------*/
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+vi.mock("vscode", () => {
+    class FakeEventEmitter<T> {
+        private readonly listeners = new Set<(e: T) => void>();
+        readonly event = (listener: (e: T) => void): { dispose(): void } => {
+            this.listeners.add(listener);
+            return {
+                dispose: () => {
+                    this.listeners.delete(listener);
+                },
+            };
+        };
+        fire(e: T): void {
+            for (const listener of [...this.listeners]) listener(e);
+        }
+        dispose(): void {
+            this.listeners.clear();
+        }
+    }
+    return { EventEmitter: FakeEventEmitter };
+});
+
 import { YoloStore } from "../../../src/state/yolo.js";
 
 class FakeMemento {
@@ -67,4 +91,23 @@ describe("YoloStore", () => {
         const keys = memento.keys();
         expect(keys).toContain("agentArena.yoloMode.primary");
     });
+
+    it("fires onDidChange when state mutates (CD-11)", async () => {
+        const events: { agentId: string; enabled: boolean }[] = [];
+        store.onDidChange((e) => events.push(e));
+        await store.set("primary", true);
+        await store.set("primary", false);
+        expect(events).toEqual([
+            { agentId: "primary", enabled: true },
+            { agentId: "primary", enabled: false },
+        ]);
+    });
+
+    it("does NOT fire onDidChange on no-op set", async () => {
+        const events: { agentId: string; enabled: boolean }[] = [];
+        store.onDidChange((e) => events.push(e));
+        await store.set("primary", false); // already false (default)
+        expect(events).toEqual([]);
+    });
 });
+

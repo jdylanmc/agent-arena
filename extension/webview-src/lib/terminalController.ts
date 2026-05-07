@@ -188,6 +188,26 @@ export class TerminalController {
         }
     }
 
+    /** Replay a transcript (CD-11 §6 hybrid). Called from `agent.bootstrap`
+     *  when the panel re-attaches to a running agent. Each prior turn's
+     *  chunks are written into xterm followed by a CRLF, then the next
+     *  prompt is drawn. */
+    replayTranscript(
+        transcript: ReadonlyArray<{ turnId: string; chunks: string[]; final?: string | undefined }>,
+    ): void {
+        for (const turn of transcript) {
+            for (const chunk of turn.chunks) {
+                this.write(chunk);
+            }
+            if (turn.final !== undefined && turn.final.length > 0 && turn.chunks.length === 0) {
+                this.write(turn.final);
+            }
+            this.write(CRLF);
+        }
+        this.isStreaming = false;
+        this.writePrompt();
+    }
+
     /** Submit a complete prompt from the bottom React input box (per
      *  CD-08 §6). The text is echoed to the xterm scrollback above the
      *  prompt line so the conversation reads cleanly, then routed

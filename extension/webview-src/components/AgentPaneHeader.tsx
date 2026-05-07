@@ -1,13 +1,14 @@
 /*---------------------------------------------------------------------------------------------
  *  webview-src/components/AgentPaneHeader.tsx
  *
- *  Per-agent header above the terminal area (per CD-08 §4). Renders:
+ *  Per-agent header above the terminal area (per CD-08 §4 / CD-11 §5).
+ *  Renders:
  *   - an avatar + ">_ <agent-name>" wordmark
  *   - the running/idle/connecting/error status text
  *   - a settings gear (non-functional in this scaffold)
  *--------------------------------------------------------------------------------------------*/
 
-import type { AgentStatus } from "./Sidebar.js";
+import type { AgentStatus } from "./Sidebar-types.js";
 
 export interface AgentPaneHeaderProps {
     agentName: string;
