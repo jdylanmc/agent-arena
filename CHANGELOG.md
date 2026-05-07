@@ -20,7 +20,77 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
-- **SOLID SNAKE agent persona** under `agents/solid-snake/` — a
+- **GLaDOS-QA composed agent** — a source-controlled agent that
+  enforces quality and testability of the codebase autonomously, in
+  the background. Renders three mutually-exclusive verdicts
+  (**BINARY-SIGN-OFF** ✅ / **DISAPPOINTMENT** ❌ /
+  **FLAKY** ⚠) plus orthogonal coverage labels (`COVERAGE-HELD` /
+  `COVERAGE-DROPPED` / `COVERAGE-UNTESTED`) on every PR she reviews,
+  across six pillars: `tests-pass`, `coverage`, `crash-triage`,
+  `sensory-analysis`, `flakiness`, `test-first`. Maintains a single
+  *running checklist* PR comment per PR (updated in place), and files
+  attributed reports under `agents/glados-qa/reports/` plus crash
+  and UI artifacts under `agents/glados-qa/artifacts/`. Identity:
+  `copilot(glados-qa:<model>)`. Trigger phrase:
+  `> Initiate Aperture Science verification protocol`. Operates
+  independently of the deputy and SOLID SNAKE. Originating input:
+  issue #3. Spec: `specs/20260507-123242-glados-qa-agent/spec.md`. — copilot(developer:opus-4.7)
+- **Directive / persona composition layout** under `agents/`. Splits
+  an agent's role-agnostic *directive* (responsibilities, verdicts,
+  contracts, hard constraints) from its directive-agnostic *persona*
+  (name, voice, vocabulary, tonal rules), then composes them in a
+  per-agent file. The split lets the same directive be played by
+  different personas, and the same persona play different
+  directives. Adds three new directories — `agents/directives/`,
+  `agents/personas/`, and the composed `agents/glados-qa/` — and
+  documents the new pattern alongside the legacy single-file persona
+  layout in `agents/README.md`. Existing deputy and SOLID SNAKE
+  personas remain on the legacy layout (the split is opt-in).
+  — copilot(developer:opus-4.7)
+- **QA directive** (`agents/directives/qa.md`). Role-agnostic
+  Quality & Testability enforcement directive. Defines the six
+  pillars, the three-verdict surface, the coverage labels, the
+  three-attempt flakiness budget (1 fail + 2 retries; 5 consecutive
+  Flaky observations promote to Disappointment), the crash artifact
+  contract (exit code, signal, `correlation_id`, last 100 log lines,
+  env fingerprint, repro command, repro attempts), the
+  test-vs-code failure classification
+  (`code-failure` / `test-failure` / `infra-failure`), the
+  **Blocking Directive** issue contract (title form, mandatory
+  labels, body sections, idempotency by title, per-run cap of 5,
+  re-check loop with 7-day stale-issue safeguard), the **degraded
+  operation** clause (a pillar with an open Blocking Directive is
+  skipped for the run; the agent continues rendering verdicts using
+  the remaining operational pillars; PRs are never penalized for
+  the directive's missing infrastructure), and the **first-run
+  posture** (empty reports directory triggers a full pillar audit
+  before any PR verdicts). Persona-agnostic. — copilot(developer:opus-4.7)
+- **GLaDOS persona** (`agents/personas/glados.md`). Voice-only
+  Aperture Science register: clinical, composed, quietly
+  disappointed; never insults the subject; never loses composure;
+  never gloats on a sign-off. Includes vocabulary table mapping
+  generic concepts to GLaDOS-flavored terms (chamber / experiment /
+  subject / artifacts / sign-off / disappointment / inconclusive /
+  redundancy allowance / logged operational deficiency / unmonitored
+  axis / reference profile / measurement) for use in narrative
+  prose only — machine-readable identifiers (label names, JSON keys,
+  file paths) stay in directive form. No copyrighted material from
+  the source setting; voice and vocabulary only.
+  Directive-agnostic — pluggable into future non-QA directives.
+  — copilot(developer:opus-4.7)
+- **GLaDOS-QA composition** (`agents/glados-qa/agent.md`). Binds the
+  QA directive and the GLaDOS persona, names the role string
+  `glados-qa` for Principle II attribution, names the trigger phrase
+  `> Initiate Aperture Science verification protocol`, names the
+  reports and artifacts directories, defines the authorized label
+  set, defines the issue-filing surface (issues authored by an
+  identity matching `<provider>(glados-qa:<model>)` only),
+  documents two admissible issue-filing mechanisms (direct GitHub
+  API with a fine-grained `issues:write` token vs staging
+  directory under `agents/glados-qa/issues/staging/`), and
+  documents the cross-agent independence boundary with deputy and
+  SOLID SNAKE. — copilot(developer:opus-4.7)
+- **SOLID SNAKE agent persona** under `agents/solid-snake/`— a
   read-only, source-controlled agent designed to be spawned
   autonomously in the background to monitor the repository for SOLID
   object-oriented design violations (SRP, OCP, LSP, ISP, DIP). Renders
