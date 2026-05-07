@@ -31,16 +31,6 @@ Principle II violation and the deputy will flag them.
   future spec); the visual contract is locked so they slot in cleanly
   when they ship. — copilot(developer:opus-4.7)
 
-- **CD-09 — EI-2 harness unload semantics**: pins down a three-state
-  unload protocol. `loadHarness` copies session directories into a
-  per-harness residency root under `${context.globalStorageUri}/harnesses/<id>/`
-  and redirects `COPILOT_HOME` there; `unloadHarness` drains in-flight
-  sessions and recursively deletes the residency root; `load(B)` after
-  `load(A) + unload(A)` starts a fresh client. Resolves the deputy's
-  outstanding ⚠ from
-  [`agents/deputy/reports/20260506-164205-deputy-report.md`](agents/deputy/reports/20260506-164205-deputy-report.md).
-  — copilot(developer:opus-4.7)
-
 - **FR-026 path correction**: harness fixture moved from
   `extension/tests/fixtures/` to `extension/tests/harnesses/` per
   `constitution.md:584-588`. Resolves the deputy's borderline ❌
