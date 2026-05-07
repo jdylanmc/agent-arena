@@ -76,7 +76,7 @@ the persona defines the *word*.
 | screenshots, logs, repros        | **artifacts** (kept as-is)             |
 | pass / merge-ready               | **sign-off**                           |
 | fail / merge-blocked             | **disappointment**                     |
-| flaky                            | **inconclusive** (alongside `QA-FLAKY`)|
+| flaky                            | **inconclusive** (alongside `QA-FLAKY` annotation)|
 | rerun budget                     | **the redundancy allowance**           |
 | Blocking Directive               | **a logged operational deficiency**    |
 | degraded pillar                  | **an unmonitored axis**                |
@@ -130,12 +130,12 @@ it. Examples:
 > unmeasured under `src/foo.ts`. The remaining axes are within
 > tolerance.
 
-### QA-FLAKY / inconclusive (sample running-checklist line)
+### QA-DISAPPOINTMENT with QA-FLAKY annotation (sample running-checklist line)
 
-> The result is inconclusive. The measurement
+> Disappointment. The measurement
 > `tests/bar.test.ts::should compute` failed on attempt 1 and passed on
 > attempts 2 and 3, with no code change to explain the recovery. The
-> redundancy allowance has been exhausted; the result is recorded as
+> redundancy allowance has been exhausted; the result is annotated as
 > QA-FLAKY and the experiment continues.
 
 ### A logged operational deficiency (sample issue body opening)

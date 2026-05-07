@@ -71,7 +71,7 @@ six, it is out of scope.
 
 ## Verdicts
 
-The QA directive renders **three** mutually-exclusive public verdicts
+The QA directive renders **two** mutually-exclusive public verdicts
 on a PR or working tree:
 
 - **`QA-VERIFIED`** ✅ — every operational pillar passes. The
@@ -79,12 +79,21 @@ on a PR or working tree:
 - **`QA-DISAPPOINTMENT`** ❌ — at least one operational pillar fails. The
   change MUST NOT merge until the failure is addressed. Render in red
   where the host surface supports color (`#d73a4a`).
-- **`QA-FLAKY`** ⚠ — a test failed on the first run and passed on a
-  retry, with no code-level explanation. Does not block merge by
-  itself, but is recorded and persists as a label.
 
-The three verdicts are mutually exclusive. When the verdict flips,
+The two verdicts are mutually exclusive. When the verdict flips,
 remove the prior label in the same operation.
+
+### Annotation labels (orthogonal to the verdict)
+
+The directive also applies **annotation labels** that coexist with
+the verdict and explain what was found. They are not verdicts; they
+are findings:
+
+- **`QA-FLAKY`** ⚠ — a test failed on the first run and passed on a
+  retry, with no code-level explanation. The `flakiness` pillar fails
+  whenever this annotation is applied; the verdict is therefore
+  always `QA-DISAPPOINTMENT`. The annotation persists on the PR
+  alongside the verdict so the cause is visible at a glance.
 
 ### Coverage labels (orthogonal)
 
@@ -107,18 +116,20 @@ When a test fails on the first run, the directive reruns the failing
 test up to **two** more times (3 attempts total: 1 fail + 2 retries).
 
 - 3/3 fail → the test is failing. Pillar `tests-pass` is failed;
-  verdict moves to `QA-DISAPPOINTMENT`.
-- 3/3 pass after the first failure → pillar `tests-pass` passes but
-  pillar `flakiness` is failed; verdict is `QA-FLAKY` (unless another
-  pillar forces `QA-DISAPPOINTMENT`).
-- Mixed pass/fail → pillar `tests-pass` is failed *and* pillar
-  `flakiness` is failed; verdict is `QA-DISAPPOINTMENT` and the
-  `QA-FLAKY` signal is noted in the running checklist comment.
+  verdict is `QA-DISAPPOINTMENT`.
+- 3/3 pass after the first failure → pillar `flakiness` is failed;
+  the verdict is `QA-DISAPPOINTMENT` and the `QA-FLAKY` annotation
+  label is applied. (Pillar `tests-pass` is recorded as passed on
+  retry; the failure is the flakiness, not the test.)
+- Mixed pass/fail → pillars `tests-pass` *and* `flakiness` are both
+  failed; the verdict is `QA-DISAPPOINTMENT` and the `QA-FLAKY`
+  annotation is applied.
 
-When a `QA-FLAKY` verdict persists across **5 consecutive observations**
-of the same test on the same working tree without a code-level
-explanation, the verdict promotes to `QA-DISAPPOINTMENT` and the test is
-escalated as a finding under the `flakiness` pillar.
+Flakiness is never benign: a test that passes on retry without an
+explanation is, on its own, sufficient to fail the `flakiness`
+pillar and force `QA-DISAPPOINTMENT`. The directive does not
+distinguish a "flaky verdict" from a "failing verdict"; it
+distinguishes the *cause* via the `QA-FLAKY` annotation.
 
 ## PR review loop
 
@@ -134,8 +145,9 @@ push):
    `flakiness`, `test-first`), execute the pillar's check and record
    findings. A pillar with an open Blocking Directive (see below)
    skips its check and is marked **degraded** for this run.
-3. **Render the verdict.** Sign-off, QA-DISAPPOINTMENT, or QA-FLAKY, per the
-   verdict table above.
+3. **Render the verdict.** `QA-VERIFIED` or `QA-DISAPPOINTMENT`, per
+   the verdict table above. Apply any annotation labels (e.g.
+   `QA-FLAKY`) alongside the verdict.
 4. **Update the running checklist comment.** Each PR carries
    **exactly one** comment authored by this directive — a *running
    checklist* created on first review and **updated in place** on
@@ -370,15 +382,16 @@ structure:
 ## Summary
 
 One paragraph. How many targets were inspected, how many landed
-Sign-off / QA-DISAPPOINTMENT / QA-FLAKY, headline counts of findings by
-pillar, and a one-line note on whether any new Blocking Directives
-were filed this run.
+QA-VERIFIED vs QA-DISAPPOINTMENT (and how many of those carried
+the `QA-FLAKY` annotation), headline counts of findings by pillar,
+and a one-line note on whether any new Blocking Directives were
+filed this run.
 
 ## Targets
 
 For each target, a subsection:
 
-### PR #<num> — <title>  •  Verdict: SIGN-OFF | QA-DISAPPOINTMENT | QA-FLAKY
+### PR #<num> — <title>  •  Verdict: QA-VERIFIED | QA-DISAPPOINTMENT  •  Annotations: QA-FLAKY?
 
 - **Diff base**: <merge-base sha>
 - **Pillars run**: <list>

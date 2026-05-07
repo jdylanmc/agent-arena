@@ -136,18 +136,19 @@ across six pillars: `tests-pass`, `coverage`, `crash-triage`,
 persona** (`agents/personas/glados.md` — clinical, composed, quietly
 disappointed Aperture register).
 
-She renders three mutually-exclusive verdicts on every PR she
+She renders two mutually-exclusive verdicts on every PR she
 reviews:
 
 - **`QA-VERIFIED`** ✅ — every operational pillar passes.
 - **`QA-DISAPPOINTMENT`** ❌ — at least one operational pillar fails
   (rendered red where labels support color).
-- **`QA-FLAKY`** ⚠ — a test failed on the first attempt and passed on a
-  retry without a code-level explanation; does not block merge by
-  itself.
 
-She applies orthogonal coverage labels (`CODE-HELD`,
-`CODE-DROPPED`, `CODE-UNTESTED`) explaining the verdict.
+She applies orthogonal **code labels** (`CODE-HELD`, `CODE-DROPPED`,
+`CODE-UNTESTED`) explaining the verdict's relationship to coverage,
+and an independent **`QA-FLAKY`** annotation when a test failed on
+the first attempt and passed on retry without a code-level
+explanation (which always forces `QA-DISAPPOINTMENT` — flakiness
+is never benign).
 
 She is read-only outside her own surfaces: she writes only to
 `agents/glados-qa/reports/` and `agents/glados-qa/artifacts/`,

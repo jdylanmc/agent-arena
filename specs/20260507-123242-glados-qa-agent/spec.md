@@ -102,7 +102,8 @@ when the operational pillars pass).
    open Blocking Directives.
 2. **Given** a PR whose tests fail on attempt 1 and pass on attempts
    2 and 3 with no code-level explanation, **When** GLaDOS-QA runs,
-   **Then** the verdict is `QA-FLAKY`, the test is recorded under the
+   **Then** the verdict is `QA-DISAPPOINTMENT`, the `QA-FLAKY`
+   annotation label is applied, the test is recorded under the
    `flakiness` pillar, and `QA-VERIFIED` is **not** applied.
 3. **Given** a PR introducing 42 net-new lines none of which are
    covered by any test, **When** GLaDOS-QA runs and the `coverage`
@@ -180,7 +181,7 @@ changes to its files.
 
 - **FR-001**: The repository MUST contain a directive file at
   `agents/directives/qa.md` describing the role-agnostic QA
-  responsibility (six pillars, three verdicts, coverage labels,
+  responsibility (six pillars, two verdicts, code labels,
   Blocking Directive contract, re-check loop, degraded operation,
   first-run posture, hard constraints).
 - **FR-002**: The repository MUST contain a persona file at
@@ -200,30 +201,37 @@ changes to its files.
 
 #### Verdicts and labels
 
-- **FR-005**: GLaDOS-QA MUST render one of three mutually-exclusive
-  verdict labels on each PR it reviews: `QA-VERIFIED`,
-  `QA-DISAPPOINTMENT`, or `QA-FLAKY`.
-- **FR-006**: GLaDOS-QA MUST apply exactly one of three coverage
-  labels orthogonal to the verdict label: `CODE-HELD`,
-  `CODE-DROPPED`, or `CODE-UNTESTED`.
-- **FR-007**: When `CODE-DROPPED` or `CODE-UNTESTED` is
-  applied, the verdict label MUST be `QA-DISAPPOINTMENT` (coverage
-  failure forces QA-DISAPPOINTMENT).
+- **FR-005**: GLaDOS-QA MUST render exactly one of two
+  mutually-exclusive verdict labels on each PR it reviews:
+  `QA-VERIFIED` or `QA-DISAPPOINTMENT`.
+- **FR-006**: GLaDOS-QA MUST apply exactly one of three code labels
+  orthogonal to the verdict label: `CODE-HELD`, `CODE-DROPPED`, or
+  `CODE-UNTESTED`.
+- **FR-007**: When `CODE-DROPPED` or `CODE-UNTESTED` is applied,
+  the verdict label MUST be `QA-DISAPPOINTMENT` (coverage failure
+  forces QA-DISAPPOINTMENT).
 - **FR-008**: When the verdict flips, the prior verdict label MUST be
   removed in the same operation.
+- **FR-008a**: GLaDOS-QA MUST apply the `QA-FLAKY` annotation label
+  whenever a test failed on the first attempt and subsequently
+  passed within the rerun budget without a code-level explanation.
+  `QA-FLAKY` is an annotation, not a verdict; it coexists with the
+  verdict label and forces the verdict to `QA-DISAPPOINTMENT`.
 
 #### Flakiness budget
 
 - **FR-009**: When a test fails on the first attempt, GLaDOS-QA MUST
   rerun it up to two more times (3 attempts total).
-- **FR-010**: A test that passes 3/3 after the first failure MUST be
-  recorded as QA-FLAKY (verdict `QA-FLAKY`).
-- **FR-011**: A test that fails on every attempt MUST be recorded as
-  failing (verdict `QA-DISAPPOINTMENT`).
-- **FR-012**: When a test produces a `QA-FLAKY` verdict on **5
-  consecutive observations** of the same test on the same working
-  tree without code-level explanation, the verdict MUST promote to
-  `QA-DISAPPOINTMENT`.
+- **FR-010**: A test that passes 3/3 after the first failure MUST
+  fail the `flakiness` pillar; the verdict MUST be
+  `QA-DISAPPOINTMENT` and the `QA-FLAKY` annotation label MUST be
+  applied.
+- **FR-011**: A test that fails on every attempt MUST fail the
+  `tests-pass` pillar; the verdict MUST be `QA-DISAPPOINTMENT`.
+- **FR-012**: A test that fails some attempts and passes others
+  ("mixed") MUST fail both the `tests-pass` and `flakiness` pillars;
+  the verdict MUST be `QA-DISAPPOINTMENT` and the `QA-FLAKY`
+  annotation label MUST be applied.
 
 #### Running checklist comment
 

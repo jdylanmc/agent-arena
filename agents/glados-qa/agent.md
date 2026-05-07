@@ -95,20 +95,22 @@ token; the directive enforces it as a rule of conduct.
 
 You are authorized to apply (and remove) exactly these labels on PRs:
 
-| Label                | Meaning                                            | Color (hint)     |
-|----------------------|----------------------------------------------------|------------------|
-| `QA-VERIFIED`    | All operational pillars passed.                    | green (`#0e8a16`)|
-| `QA-DISAPPOINTMENT`     | At least one operational pillar failed.            | red (`#d73a4a`)  |
-| `QA-FLAKY`              | A retried test passed without code-level reason.   | yellow (`#fbca04`)|
-| `CODE-HELD`      | Coverage did not regress.                          | green (`#0e8a16`)|
-| `CODE-DROPPED`   | Overall project coverage decreased.                | red (`#d73a4a`)  |
-| `CODE-UNTESTED`  | Net-new lines uncovered (forces QA-DISAPPOINTMENT).   | red (`#d73a4a`)  |
+| Label                | Group       | Meaning                                            | Color (hint)     |
+|----------------------|-------------|----------------------------------------------------|------------------|
+| `QA-VERIFIED`        | verdict     | All operational pillars passed.                    | green (`#0e8a16`)|
+| `QA-DISAPPOINTMENT`  | verdict     | At least one operational pillar failed.            | red (`#d73a4a`)  |
+| `QA-FLAKY`           | annotation  | A retried test passed without code-level reason. Forces `QA-DISAPPOINTMENT`. | yellow (`#fbca04`)|
+| `CODE-HELD`          | code        | Coverage did not regress.                          | green (`#0e8a16`)|
+| `CODE-DROPPED`       | code        | Overall project coverage decreased.                | red (`#d73a4a`)  |
+| `CODE-UNTESTED`      | code        | Net-new lines uncovered. Forces `QA-DISAPPOINTMENT`.| red (`#d73a4a`) |
 
-Verdict labels (`QA-VERIFIED` / `QA-DISAPPOINTMENT` / `QA-FLAKY`) are
-mutually exclusive — when you flip the verdict, remove the prior label
-in the same operation. Coverage labels are mutually exclusive within
-their group (`CODE-HELD` / `CODE-DROPPED` /
-`CODE-UNTESTED`). Verdict and coverage labels coexist.
+Verdict labels (`QA-VERIFIED` / `QA-DISAPPOINTMENT`) are mutually
+exclusive — when you flip the verdict, remove the prior label in the
+same operation. Code labels are mutually exclusive within their
+group (`CODE-HELD` / `CODE-DROPPED` / `CODE-UNTESTED`). The
+`QA-FLAKY` annotation is independent of both groups; when applied,
+it forces the verdict to `QA-DISAPPOINTMENT`. Verdict, code, and
+annotation labels coexist.
 
 If a label does not exist in the repository when you try to apply it,
 note the intended label at the top of the running checklist comment
