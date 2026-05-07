@@ -92,6 +92,21 @@ export default [
     },
   },
   {
+    // Integration tests run under Mocha (via @vscode/test-cli), not vitest.
+    // Mocha's describe/it/before/after globals are injected by the runner.
+    files: ["test/integration/**/*.ts"],
+    languageOptions: {
+      globals: {
+        describe: "readonly",
+        it: "readonly",
+        before: "readonly",
+        after: "readonly",
+        beforeEach: "readonly",
+        afterEach: "readonly",
+      },
+    },
+  },
+  {
     ignores: ["dist/**", "node_modules/**", "*.config.*", ".vscode-test.mjs", "scripts/**"],
   },
 ];

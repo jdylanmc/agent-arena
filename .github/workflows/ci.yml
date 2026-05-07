@@ -63,6 +63,13 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Integration tests
+        # Headless VS Code requires xvfb on Ubuntu; on Windows the runner
+        # has trouble keeping a windowed Code instance alive in CI. Limit
+        # integration to Linux for now.
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration
+
       - name: Build (host + webview)
         run: npm run build
 
