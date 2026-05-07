@@ -40,6 +40,7 @@ export interface AdapterSelection {
 
 export interface SelectAdapterOptions {
     emitter: EventEmitter;
+    extensionPath: string;
     copilotHome: string;
     telemetryFilePath: string;
     fakeAutoRespond: (prompt: string) => string[];
@@ -60,7 +61,7 @@ export async function selectAdapter(opts: SelectAdapterOptions): Promise<Adapter
         return { adapter: fake, kind: "fake-demo", fallbackReason: "fake_forced" };
     }
 
-    const real = new CopilotSdkAdapter();
+    const real = new CopilotSdkAdapter({ extensionPath: opts.extensionPath });
     try {
         await real.start({
             copilotHome: opts.copilotHome,

@@ -17,8 +17,20 @@
  *  and is preserved by esbuild for externalized packages, so we lazy-load
  *  the SDK on `start()`. Type-only imports below are erased at compile
  *  time and therefore do not require a runtime resolution path.
+ *
+ *  CLI-binary discovery: the SDK's default `getNodeExecPath()` returns
+ *  `process.execPath`, which inside VS Code's extension host points at
+ *  the Electron binary (Code.exe), not at `node`. Attempting to spawn
+ *  Electron with the bundled `index.js` script fails immediately. To
+ *  work around this we explicitly point `cliPath` at the OS-specific
+ *  pre-built binary that ships in `@github/copilot-<platform>-<arch>`,
+ *  so the SDK spawns the binary directly and skips its Node fallback.
  *--------------------------------------------------------------------------------------------*/
 
+import * as path from "node:path";
+import { existsSync } from "node:fs";
+import type { SdkAdapter, SdkSessionHandle } from "./SdkAdapter.js";
+import type * as CopilotSdkModule from "@github/copilot-sdk";
 import type {
     CopilotClient,
     CopilotSession,
@@ -32,8 +44,6 @@ import type {
     SessionEventType,
     TypedSessionEventHandler,
 } from "@github/copilot-sdk";
-import type { SdkAdapter, SdkSessionHandle } from "./SdkAdapter.js";
-import type * as CopilotSdkModule from "@github/copilot-sdk";
 
 type SdkModule = typeof CopilotSdkModule;
 
@@ -46,14 +56,28 @@ async function loadSdkModule(): Promise<SdkModule> {
     return cachedSdkModule;
 }
 
+export interface CopilotSdkAdapterOptions {
+    /** Absolute path to the extension's installation root (typically
+     *  `context.extensionUri.fsPath`). Used to locate the bundled
+     *  Copilot CLI binary at
+     *  `<extensionPath>/node_modules/@github/copilot-<platform>-<arch>/copilot[.exe]`. */
+    extensionPath: string;
+}
+
 export class CopilotSdkAdapter implements SdkAdapter {
     private client: CopilotClient | undefined;
     private started = false;
+    private readonly extensionPath: string;
+
+    constructor(opts: CopilotSdkAdapterOptions) {
+        this.extensionPath = opts.extensionPath;
+    }
 
     async start(opts: { copilotHome: string; telemetryFilePath: string }): Promise<void> {
         if (this.started) return;
 
         const sdk = await loadSdkModule();
+        const cliPath = this.resolveBundledCliBinary();
 
         // The SDK's CopilotClientOptions (v0.1.32) doesn't expose a
         // `telemetry` or `copilotHome` field — those are configured via
@@ -64,6 +88,7 @@ export class CopilotSdkAdapter implements SdkAdapter {
         // we rely on the SDK's default log location and the canonical
         // EI-1 log catches the events that matter (per CD-01).
         const options: CopilotClientOptions = {
+            cliPath,
             env: {
                 ...process.env,
                 COPILOT_HOME: opts.copilotHome,
@@ -107,7 +132,7 @@ export class CopilotSdkAdapter implements SdkAdapter {
         const sdk = await loadSdkModule();
         // ResumeSessionConfig requires onPermissionRequest. Default to
         // approveAll if the caller didn't supply one (edge case — the
-        // PrimaryAgentTerminal always supplies one).
+        // PrimaryAgentPanel always supplies one).
         const cfg: ResumeSessionConfig = {
             onPermissionRequest: opts?.onPermissionRequest ?? sdk.approveAll,
             ...(opts ?? {}),
@@ -153,6 +178,32 @@ export class CopilotSdkAdapter implements SdkAdapter {
         if (!this.client) throw new Error("CopilotSdkAdapter: start() must be called first");
         return this.client;
     }
+
+    /** Compute the absolute path of the OS-specific Copilot CLI binary
+     *  bundled with the npm package. The binary lives under
+     *  `node_modules/@github/copilot-<platform>-<arch>/copilot[.exe]`
+     *  inside the extension's install directory. We bypass Node's CJS
+     *  resolver because the package's exports map only exposes
+     *  `./copilot.exe` (not subpath-resolvable for non-JS files). */
+    private resolveBundledCliBinary(): string {
+        const platform = process.platform;
+        const arch = process.arch;
+        const ext = platform === "win32" ? ".exe" : "";
+        const binPath = path.join(
+            this.extensionPath,
+            "node_modules",
+            "@github",
+            `copilot-${platform}-${arch}`,
+            `copilot${ext}`,
+        );
+        if (!existsSync(binPath)) {
+            throw new Error(
+                `Bundled Copilot CLI binary not found at ${binPath}. ` +
+                    `Ensure @github/copilot is installed for the extension's host platform (${platform}-${arch}).`,
+            );
+        }
+        return binPath;
+    }
 }
 
 /** Wrap a `CopilotSession` to expose it through our `SdkSessionHandle`
@@ -179,9 +230,7 @@ function wrapSession(session: CopilotSession): SdkSessionHandle {
         async abortCurrentTurn(): Promise<void> {
             // The SDK doesn't expose an abort-turn primitive in v0.1.32.
             // Per R-11b this lands when the SDK ships one; for now this is
-            // a no-op so the adapter contract stays satisfied. The
-            // terminal's Ctrl+C handler catches this case and disconnects
-            // the session if the user really wants to stop a runaway turn.
+            // a no-op so the adapter contract stays satisfied.
         },
         async disconnect(): Promise<void> {
             await session.disconnect();

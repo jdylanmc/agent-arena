@@ -76,6 +76,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     async () =>
                         await selectAdapter({
                             emitter: emitter!,
+                            extensionPath: context.extensionUri.fsPath,
                             copilotHome: vscode.Uri.joinPath(
                                 context.globalStorageUri,
                                 ".copilot",
