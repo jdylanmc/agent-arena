@@ -23,6 +23,7 @@ bug-fix PR MUST add a `wiki/bugs/` entry.
 | [`sources/vscode-extensions-api.md`](sources/vscode-extensions-api.md) | VS Code Extensions API — contribution points + runtime APIs | FR-028 |
 | [`sources/vscode-source.md`](sources/vscode-source.md) | VS Code source itself — theme/branding alignment, core libraries + architectural patterns, terminal-integration deep-dive | reference |
 | [`sources/vscode-copilot.md`](sources/vscode-copilot.md) | GitHub Copilot integration in VS Code — auth providers, chat-extensions API, inline-completions, telemetry posture | reference, CD-10 |
+| [`sources/vscode-terminals.md`](sources/vscode-terminals.md) | VS Code integrated terminal — user-facing feature surface + `OSC 633` shell-integration protocol; informs the CD-07 reversal toward `vscode.Pseudoterminal` | reference, CD-07 reversal |
 
 ## Glossary
 
