@@ -26,8 +26,7 @@
     "onCommand:agent-arena.toggleYolo",
     "onCommand:agent-arena.showTraceLog",
     "onCommand:agent-arena.harness.export",
-    "onCommand:agent-arena.harness.import",
-    "onStartupFinished"
+    "onCommand:agent-arena.harness.import"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {

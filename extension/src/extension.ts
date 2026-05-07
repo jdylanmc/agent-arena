@@ -36,7 +36,6 @@ let emitter: EventEmitter | undefined;
 let yoloStatusBar: YoloStatusBar | undefined;
 let primaryPanel: PrimaryAgentPanel | undefined;
 let adapterSelection: AdapterSelection | undefined;
-let hasAutoOpenedThisSession = false;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     const eventsLogPath = vscode.Uri.joinPath(context.logUri, "agent-arena.events.jsonl");
@@ -146,17 +145,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.commands.registerCommand("agent-arena.openPrimaryAgent", () => openPrimary()),
     );
 
-    // ----- Auto-open on first activation (per CD-07 §3) -----
-    // Subsequent activations of the same VS Code session will not re-open
-    // automatically; the user can re-summon via the activity-bar entry or
-    // the Command Palette. Open beside the welcome page so it stays visible.
-    if (!hasAutoOpenedThisSession) {
-        hasAutoOpenedThisSession = true;
-        // Defer to next tick so the activity-bar registration completes first.
-        setTimeout(() => {
-            void openPrimary(vscode.ViewColumn.Beside);
-        }, 250);
-    }
+    // Per CD-12 §8 + rubber-duck A4: no `onStartupFinished` activation, no
+    // auto-open on activate. The Activity-Bar TreeView's
+    // `onDidChangeVisibility` (registered in registerView.ts) is the SOLE
+    // trigger that opens the panel — that's how the user invokes us.
 
     // ----- Other commands (showTraceLog, harness import/export) -----
     registerCommands({ context, emitter, eventsLogPath });
