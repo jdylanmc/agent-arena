@@ -76,10 +76,10 @@ on a PR or working tree:
 
 - **`QA-VERIFIED`** ✅ — every operational pillar passes. The
   change is signed off and may merge as far as QA is concerned.
-- **`DISAPPOINTMENT`** ❌ — at least one operational pillar fails. The
+- **`QA-DISAPPOINTMENT`** ❌ — at least one operational pillar fails. The
   change MUST NOT merge until the failure is addressed. Render in red
   where the host surface supports color (`#d73a4a`).
-- **`FLAKY`** ⚠ — a test failed on the first run and passed on a
+- **`QA-FLAKY`** ⚠ — a test failed on the first run and passed on a
   retry, with no code-level explanation. Does not block merge by
   itself, but is recorded and persists as a label.
 
@@ -91,12 +91,12 @@ remove the prior label in the same operation.
 Coverage findings carry their own labels because they are independent
 of the test-execution outcome:
 
-- **`COVERAGE-HELD`** ✅ — coverage did not drop and net-new lines are
+- **`CODE-HELD`** ✅ — coverage did not drop and net-new lines are
   exercised.
-- **`COVERAGE-DROPPED`** ❌ — overall project coverage decreased.
-  Forces `DISAPPOINTMENT`.
-- **`COVERAGE-UNTESTED`** ❌ — net-new lines exist that no test
-  exercises, even if overall coverage held. Forces `DISAPPOINTMENT`.
+- **`CODE-DROPPED`** ❌ — overall project coverage decreased.
+  Forces `QA-DISAPPOINTMENT`.
+- **`CODE-UNTESTED`** ❌ — net-new lines exist that no test
+  exercises, even if overall coverage held. Forces `QA-DISAPPOINTMENT`.
 
 Coverage labels coexist with the public verdict label; together they
 explain *why* a verdict is what it is.
@@ -107,17 +107,17 @@ When a test fails on the first run, the directive reruns the failing
 test up to **two** more times (3 attempts total: 1 fail + 2 retries).
 
 - 3/3 fail → the test is failing. Pillar `tests-pass` is failed;
-  verdict moves to `DISAPPOINTMENT`.
+  verdict moves to `QA-DISAPPOINTMENT`.
 - 3/3 pass after the first failure → pillar `tests-pass` passes but
-  pillar `flakiness` is failed; verdict is `FLAKY` (unless another
-  pillar forces `DISAPPOINTMENT`).
+  pillar `flakiness` is failed; verdict is `QA-FLAKY` (unless another
+  pillar forces `QA-DISAPPOINTMENT`).
 - Mixed pass/fail → pillar `tests-pass` is failed *and* pillar
-  `flakiness` is failed; verdict is `DISAPPOINTMENT` and the
-  `FLAKY` signal is noted in the running checklist comment.
+  `flakiness` is failed; verdict is `QA-DISAPPOINTMENT` and the
+  `QA-FLAKY` signal is noted in the running checklist comment.
 
-When a `FLAKY` verdict persists across **5 consecutive observations**
+When a `QA-FLAKY` verdict persists across **5 consecutive observations**
 of the same test on the same working tree without a code-level
-explanation, the verdict promotes to `DISAPPOINTMENT` and the test is
+explanation, the verdict promotes to `QA-DISAPPOINTMENT` and the test is
 escalated as a finding under the `flakiness` pillar.
 
 ## PR review loop
@@ -134,7 +134,7 @@ push):
    `flakiness`, `test-first`), execute the pillar's check and record
    findings. A pillar with an open Blocking Directive (see below)
    skips its check and is marked **degraded** for this run.
-3. **Render the verdict.** Sign-off, Disappointment, or Flaky, per the
+3. **Render the verdict.** Sign-off, QA-DISAPPOINTMENT, or QA-FLAKY, per the
    verdict table above.
 4. **Update the running checklist comment.** Each PR carries
    **exactly one** comment authored by this directive — a *running
@@ -144,8 +144,8 @@ push):
 5. **Apply labels.** Apply the verdict label and any coverage labels.
    Verdict labels are mutually exclusive (remove the prior one in the
    same operation). Coverage labels are mutually exclusive within
-   their group (`COVERAGE-HELD` / `COVERAGE-DROPPED` /
-   `COVERAGE-UNTESTED`).
+   their group (`CODE-HELD` / `CODE-DROPPED` /
+   `CODE-UNTESTED`).
 6. **Persist the finding** in the run report under the composed
    agent's reports directory (e.g. `agents/<composed-name>/reports/`).
 
@@ -370,7 +370,7 @@ structure:
 ## Summary
 
 One paragraph. How many targets were inspected, how many landed
-Sign-off / Disappointment / Flaky, headline counts of findings by
+Sign-off / QA-DISAPPOINTMENT / QA-FLAKY, headline counts of findings by
 pillar, and a one-line note on whether any new Blocking Directives
 were filed this run.
 
@@ -378,7 +378,7 @@ were filed this run.
 
 For each target, a subsection:
 
-### PR #<num> — <title>  •  Verdict: SIGN-OFF | DISAPPOINTMENT | FLAKY
+### PR #<num> — <title>  •  Verdict: SIGN-OFF | QA-DISAPPOINTMENT | QA-FLAKY
 
 - **Diff base**: <merge-base sha>
 - **Pillars run**: <list>

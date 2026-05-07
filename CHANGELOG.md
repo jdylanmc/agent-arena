@@ -23,9 +23,9 @@ Principle II violation and the deputy will flag them.
 - **GLaDOS-QA composed agent** — a source-controlled agent that
   enforces quality and testability of the codebase autonomously, in
   the background. Renders three mutually-exclusive verdicts
-  (**QA-VERIFIED** ✅ / **DISAPPOINTMENT** ❌ /
-  **FLAKY** ⚠) plus orthogonal coverage labels (`COVERAGE-HELD` /
-  `COVERAGE-DROPPED` / `COVERAGE-UNTESTED`) on every PR she reviews,
+  (**QA-VERIFIED** ✅ / **QA-DISAPPOINTMENT** ❌ /
+  **QA-FLAKY** ⚠) plus orthogonal coverage labels (`CODE-HELD` /
+  `CODE-DROPPED` / `CODE-UNTESTED`) on every PR she reviews,
   across six pillars: `tests-pass`, `coverage`, `crash-triage`,
   `sensory-analysis`, `flakiness`, `test-first`. Maintains a single
   *running checklist* PR comment per PR (updated in place), and files
@@ -51,7 +51,7 @@ Principle II violation and the deputy will flag them.
   Quality & Testability enforcement directive. Defines the six
   pillars, the three-verdict surface, the coverage labels, the
   three-attempt flakiness budget (1 fail + 2 retries; 5 consecutive
-  Flaky observations promote to Disappointment), the crash artifact
+  QA-FLAKY observations promote to QA-DISAPPOINTMENT), the crash artifact
   contract (exit code, signal, `correlation_id`, last 100 log lines,
   env fingerprint, repro command, repro attempts), the
   test-vs-code failure classification

@@ -102,12 +102,12 @@ when the operational pillars pass).
    open Blocking Directives.
 2. **Given** a PR whose tests fail on attempt 1 and pass on attempts
    2 and 3 with no code-level explanation, **When** GLaDOS-QA runs,
-   **Then** the verdict is `FLAKY`, the test is recorded under the
+   **Then** the verdict is `QA-FLAKY`, the test is recorded under the
    `flakiness` pillar, and `QA-VERIFIED` is **not** applied.
 3. **Given** a PR introducing 42 net-new lines none of which are
    covered by any test, **When** GLaDOS-QA runs and the `coverage`
    pillar is operational, **Then** the labels applied are
-   `DISAPPOINTMENT` and `COVERAGE-UNTESTED`.
+   `QA-DISAPPOINTMENT` and `CODE-UNTESTED`.
 
 ---
 
@@ -202,13 +202,13 @@ changes to its files.
 
 - **FR-005**: GLaDOS-QA MUST render one of three mutually-exclusive
   verdict labels on each PR it reviews: `QA-VERIFIED`,
-  `DISAPPOINTMENT`, or `FLAKY`.
+  `QA-DISAPPOINTMENT`, or `QA-FLAKY`.
 - **FR-006**: GLaDOS-QA MUST apply exactly one of three coverage
-  labels orthogonal to the verdict label: `COVERAGE-HELD`,
-  `COVERAGE-DROPPED`, or `COVERAGE-UNTESTED`.
-- **FR-007**: When `COVERAGE-DROPPED` or `COVERAGE-UNTESTED` is
-  applied, the verdict label MUST be `DISAPPOINTMENT` (coverage
-  failure forces disappointment).
+  labels orthogonal to the verdict label: `CODE-HELD`,
+  `CODE-DROPPED`, or `CODE-UNTESTED`.
+- **FR-007**: When `CODE-DROPPED` or `CODE-UNTESTED` is
+  applied, the verdict label MUST be `QA-DISAPPOINTMENT` (coverage
+  failure forces QA-DISAPPOINTMENT).
 - **FR-008**: When the verdict flips, the prior verdict label MUST be
   removed in the same operation.
 
@@ -217,13 +217,13 @@ changes to its files.
 - **FR-009**: When a test fails on the first attempt, GLaDOS-QA MUST
   rerun it up to two more times (3 attempts total).
 - **FR-010**: A test that passes 3/3 after the first failure MUST be
-  recorded as flaky (verdict `FLAKY`).
+  recorded as QA-FLAKY (verdict `QA-FLAKY`).
 - **FR-011**: A test that fails on every attempt MUST be recorded as
-  failing (verdict `DISAPPOINTMENT`).
-- **FR-012**: When a test produces a `FLAKY` verdict on **5
+  failing (verdict `QA-DISAPPOINTMENT`).
+- **FR-012**: When a test produces a `QA-FLAKY` verdict on **5
   consecutive observations** of the same test on the same working
   tree without code-level explanation, the verdict MUST promote to
-  `DISAPPOINTMENT`.
+  `QA-DISAPPOINTMENT`.
 
 #### Running checklist comment
 

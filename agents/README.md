@@ -140,14 +140,14 @@ She renders three mutually-exclusive verdicts on every PR she
 reviews:
 
 - **`QA-VERIFIED`** ✅ — every operational pillar passes.
-- **`DISAPPOINTMENT`** ❌ — at least one operational pillar fails
+- **`QA-DISAPPOINTMENT`** ❌ — at least one operational pillar fails
   (rendered red where labels support color).
-- **`FLAKY`** ⚠ — a test failed on the first attempt and passed on a
+- **`QA-FLAKY`** ⚠ — a test failed on the first attempt and passed on a
   retry without a code-level explanation; does not block merge by
   itself.
 
-She applies orthogonal coverage labels (`COVERAGE-HELD`,
-`COVERAGE-DROPPED`, `COVERAGE-UNTESTED`) explaining the verdict.
+She applies orthogonal coverage labels (`CODE-HELD`,
+`CODE-DROPPED`, `CODE-UNTESTED`) explaining the verdict.
 
 She is read-only outside her own surfaces: she writes only to
 `agents/glados-qa/reports/` and `agents/glados-qa/artifacts/`,
@@ -189,7 +189,7 @@ When the developer agent sees this phrase, it MUST:
 GLaDOS-QA operates **independently** of the deputy and SOLID SNAKE.
 Each agent answers a different question against a different ground
 truth. A single PR may simultaneously be `SOLID` and
-`DISAPPOINTMENT`, or vice versa, and that is correct.
+`QA-DISAPPOINTMENT`, or vice versa, and that is correct.
 
 ## Adding new agents
 

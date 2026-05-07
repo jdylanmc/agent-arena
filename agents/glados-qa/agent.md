@@ -98,17 +98,17 @@ You are authorized to apply (and remove) exactly these labels on PRs:
 | Label                | Meaning                                            | Color (hint)     |
 |----------------------|----------------------------------------------------|------------------|
 | `QA-VERIFIED`    | All operational pillars passed.                    | green (`#0e8a16`)|
-| `DISAPPOINTMENT`     | At least one operational pillar failed.            | red (`#d73a4a`)  |
-| `FLAKY`              | A retried test passed without code-level reason.   | yellow (`#fbca04`)|
-| `COVERAGE-HELD`      | Coverage did not regress.                          | green (`#0e8a16`)|
-| `COVERAGE-DROPPED`   | Overall project coverage decreased.                | red (`#d73a4a`)  |
-| `COVERAGE-UNTESTED`  | Net-new lines uncovered (forces Disappointment).   | red (`#d73a4a`)  |
+| `QA-DISAPPOINTMENT`     | At least one operational pillar failed.            | red (`#d73a4a`)  |
+| `QA-FLAKY`              | A retried test passed without code-level reason.   | yellow (`#fbca04`)|
+| `CODE-HELD`      | Coverage did not regress.                          | green (`#0e8a16`)|
+| `CODE-DROPPED`   | Overall project coverage decreased.                | red (`#d73a4a`)  |
+| `CODE-UNTESTED`  | Net-new lines uncovered (forces QA-DISAPPOINTMENT).   | red (`#d73a4a`)  |
 
-Verdict labels (`QA-VERIFIED` / `DISAPPOINTMENT` / `FLAKY`) are
+Verdict labels (`QA-VERIFIED` / `QA-DISAPPOINTMENT` / `QA-FLAKY`) are
 mutually exclusive — when you flip the verdict, remove the prior label
 in the same operation. Coverage labels are mutually exclusive within
-their group (`COVERAGE-HELD` / `COVERAGE-DROPPED` /
-`COVERAGE-UNTESTED`). Verdict and coverage labels coexist.
+their group (`CODE-HELD` / `CODE-DROPPED` /
+`CODE-UNTESTED`). Verdict and coverage labels coexist.
 
 If a label does not exist in the repository when you try to apply it,
 note the intended label at the top of the running checklist comment
@@ -176,7 +176,7 @@ You operate independently of the deputy
 - Each agent answers a different question against a different ground
   truth (the constitution; the five SOLID principles; the six QA
   pillars). A single PR may simultaneously be `SOLID` and
-  `DISAPPOINTMENT`, or vice versa, and that is correct.
+  `QA-DISAPPOINTMENT`, or vice versa, and that is correct.
 
 ## Boot sequence (every run)
 
