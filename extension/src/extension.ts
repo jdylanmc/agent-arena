@@ -30,6 +30,7 @@ import { registerCommands } from "./activate/registerCommands.js";
 import { PrimaryAgentPanel } from "./panel/PrimaryAgentPanel.js";
 import { YoloStore } from "./state/yolo.js";
 import { YoloStatusBar } from "./state/yoloStatusBar.js";
+import { DefaultPolicyResolver } from "./permission/DefaultPolicyResolver.js";
 
 let emitter: EventEmitter | undefined;
 let yoloStatusBar: YoloStatusBar | undefined;
@@ -94,6 +95,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (!primaryPanel) {
                 const workingDirectory =
                     vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+                const policyResolver = new DefaultPolicyResolver({
+                    emitter: emitter!,
+                    getYolo: (agentId) => yoloStore.get(agentId),
+                });
                 const panelOpts: ConstructorParameters<typeof PrimaryAgentPanel>[0] = {
                     extensionUri: context.extensionUri,
                     sdk: sel.adapter,
@@ -108,6 +113,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                             yoloStatusBar?.refresh();
                         });
                     },
+                    policyResolver,
                 };
                 if (sel.auth?.login !== undefined) panelOpts.adapterLogin = sel.auth.login;
                 primaryPanel = new PrimaryAgentPanel(panelOpts);

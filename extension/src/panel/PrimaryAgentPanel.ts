@@ -32,6 +32,7 @@ import type {
 } from "../protocol/types.js";
 import type { z } from "zod";
 import { mintCorrelationId, mintSessionId, mintMessageId } from "../shared/ids.js";
+import type { PolicyResolver } from "../permission/PermissionPolicy.js";
 
 const VIEW_TYPE = "agent-arena.primaryAgent";
 
@@ -46,6 +47,10 @@ export interface PrimaryAgentPanelOptions {
     adapterLogin?: string;
     getYolo: () => boolean;
     setYolo: (next: boolean) => void;
+    /** Resolves the active PermissionPolicy per agent on each tool
+     *  invocation (FR-019 / R-06). The default resolver picks
+     *  YoloPolicy when yolo is on and PromptUserPolicy otherwise. */
+    policyResolver: PolicyResolver;
 }
 
 /** Encapsulates ONE primary-agent WebviewPanel + the SDK session that
@@ -188,57 +193,40 @@ export class PrimaryAgentPanel implements vscode.Disposable {
         if (this.session) return;
         const sessionId = mintSessionId(this.opts.agentId);
         const correlationId = mintCorrelationId();
+        const policyResolver = this.opts.policyResolver;
 
         const handle = await this.opts.sdk.createSession({
             sessionId,
             workingDirectory: this.opts.workingDirectory,
-            onPermissionRequest: async (request: {
-                toolName?: string;
-                summary?: string;
-            }): Promise<{ kind: "approved" | "denied"; reason?: string }> => {
-                if (this.opts.getYolo()) {
-                    this.opts.emitter.emitNew({
-                        level: "info",
-                        event: EVENT_NAMES.AA_PERMISSION_RESOLVED,
-                        agent_id: this.opts.agentId,
-                        correlation_id: correlationId,
-                        payload: {
-                            decision: "allow",
-                            source: "yolo",
-                            toolName: request?.toolName,
-                        },
-                    });
-                    return { kind: "approved" };
+            // FR-019 / R-06 — the shim resolves the active PermissionPolicy
+            // for this agent on EVERY tool invocation (not just at session
+            // creation), so a yolo toggle takes effect immediately without
+            // restarting the session. Future per-tool policies plug into
+            // PolicyResolver.forAgent without changing this call site.
+            onPermissionRequest: async (
+                request: { toolName?: string; summary?: string } & Record<string, unknown>,
+            ): Promise<{ kind: "approved" | "denied"; reason?: string }> => {
+                const policy = policyResolver.forAgent(this.opts.agentId);
+                const decision = await policy.decide({
+                    agentId: this.opts.agentId,
+                    sessionId,
+                    correlationId,
+                    request: request as never,
+                    invocation: {
+                        toolName: request?.toolName ?? "",
+                    } as never,
+                });
+                if (decision.kind === "allow") {
+                    return decision.reason !== undefined
+                        ? { kind: "approved", reason: decision.reason }
+                        : { kind: "approved" };
                 }
-                this.opts.emitter.emitNew({
-                    level: "info",
-                    event: EVENT_NAMES.AA_PERMISSION_PROMPTED,
-                    agent_id: this.opts.agentId,
-                    correlation_id: correlationId,
-                    payload: {
-                        toolName: request?.toolName,
-                        summary: request?.summary,
-                    },
-                });
-                const choice = await vscode.window.showInformationMessage(
-                    `Agent Arena: allow ${request?.toolName ?? "this tool"}?\n\n${request?.summary ?? ""}`,
-                    { modal: true },
-                    "Allow",
-                    "Deny",
-                );
-                const allowed = choice === "Allow";
-                this.opts.emitter.emitNew({
-                    level: "info",
-                    event: EVENT_NAMES.AA_PERMISSION_RESOLVED,
-                    agent_id: this.opts.agentId,
-                    correlation_id: correlationId,
-                    payload: {
-                        decision: allowed ? "allow" : "deny",
-                        source: "modal",
-                        toolName: request?.toolName,
-                    },
-                });
-                return allowed ? { kind: "approved" } : { kind: "denied" };
+                if (decision.kind === "deny") {
+                    return { kind: "denied", reason: decision.reason };
+                }
+                // "ask" is reserved for future per-tool policies; for the
+                // scaffold we treat it as deny-with-reason.
+                return { kind: "denied", reason: "policy_returned_ask" };
             },
         } as never);
         this.session = handle;
