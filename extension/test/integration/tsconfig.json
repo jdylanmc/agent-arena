@@ -1,0 +1,21 @@
+/*---------------------------------------------------------------------------------------------
+ *  test/integration/tsconfig.json
+ *
+ *  Compile-target config for integration tests. They run inside a real
+ *  VS Code instance via @vscode/test-cli, which expects compiled JS.
+ *  We compile to dist/test-integration/ before invoking vscode-test.
+ *--------------------------------------------------------------------------------------------*/
+
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "../../",
+        "outDir": "../../dist/test-integration",
+        "noEmit": false,
+        "module": "Node16",
+        "moduleResolution": "Node16",
+        "types": ["mocha", "node", "vscode"]
+    },
+    "include": ["./**/*.ts", "../../src/**/*.ts"],
+    "exclude": ["../unit/**/*"]
+}

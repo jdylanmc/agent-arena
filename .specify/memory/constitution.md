@@ -107,6 +107,25 @@ Pre-ratification revisions (still v1.0.0, not yet merged):
     truly needed, must live in a gated adversarial corpus outside
     source control and be referenced by hash/ID. The deputy's
     per-run checklist grew item 11 to scan for prohibition violations.
+  - 2026-05-06: Clarified Principle II's model identifier convention
+    and broadened the deputy's invocation paths. The model component
+    of the canonical `<provider>(<role>:<model>)` identity MUST be the
+    provider's primary model name only — drop access-tier
+    (`-internal`), context-window (`-1m`), and reasoning-level
+    (`-high`, `-xhigh`) suffixes; keep product-variant suffixes
+    (`-mini`, `-codex`). Examples in Principle II and the *Changelog
+    discipline* bullet were corrected accordingly. The mirror
+    clarification was added to `agents/deputy/persona.md`. The
+    *Constitution enforcement (the Deputy)* subsection was expanded to
+    recognize **direct human role assignment** ("you are the deputy")
+    as a first-class invocation path alongside the trigger phrase, so
+    the human-as-developer can construct an agent into the deputy
+    role on a fresh checkout before any developer agent exists. Prior
+    `[Unreleased]` CHANGELOG entries that already carry the
+    `-xhigh`-suffixed trailer were intentionally left as-is — those
+    are point-of-authorship records by the human developer using the
+    pre-clarification convention, and Principle II forbids
+    after-the-fact identity rewrites.
   - 2026-05-06: Added a new **Engineering Invariants** section between
     Prohibitions and Knowledge Base. This is a partial, deliberate
     refinement of the earlier "all product/runtime decisions live in
@@ -259,9 +278,19 @@ during review does not satisfy this principle.
 The canonical inline form, used wherever the identity rides alongside the
 content it authored (changelog bullets, inbox entries, deputy report
 findings, agent-authored comments), is an em-dash followed by the identity
-in parentheses-free form, e.g. `— copilot(developer:opus-4.7-xhigh)`. When
+in parentheses-free form, e.g. `— copilot(developer:opus-4.7)`. When
 a single artifact has multiple agent authors they MUST all be listed,
 comma-separated.
+
+The model component of the identity MUST be the provider's canonical
+primary model name only — for example `opus-4.7`, `sonnet-4.6`,
+`gpt-5.4`, `haiku-4.5`, `gpt-5-mini`, `gpt-5.3-codex`. Drop access-tier
+suffixes (`-internal`), context-window suffixes (`-1m`), and
+reasoning-level suffixes (`-high`, `-xhigh`); keep product-variant
+suffixes (`-mini`, `-codex`) since they name different models, not
+different runtime configurations of the same model. Concretely,
+`claude-opus-4.7-1m-internal` is recorded as `opus-4.7`, but
+`gpt-5-mini` stays `gpt-5-mini`.
 
 Rationale: Origin is the foundation of trust, accountability, and replay. An
 unattributed action cannot be audited, reverted with confidence, or weighted
@@ -633,7 +662,7 @@ defined in the relevant feature spec, not here.
     MUST end with an agentic identity trailer in the canonical
     Principle II inline form — an em-dash followed by
     `<provider>(<role>:<model>)`, e.g.
-    `— copilot(developer:opus-4.7-xhigh)`. Bullets authored by multiple
+    `— copilot(developer:opus-4.7)`. Bullets authored by multiple
     agents list each identity, comma-separated. Bullets authored by a
     human carry the human's name in the same trailer position
     (e.g. `— @jdylanmc`). Anonymous changelog entries are a Principle II
@@ -700,11 +729,16 @@ tree, and the constitution itself, and files attributed reports under
 `agents/deputy/reports/`. The deputy MUST NOT mutate anything outside
 its own reports directory.
 
-The deputy is invoked by the trigger phrase
-**`> Start the deputy agent workflow`** issued to whichever developer
-agent is currently driving the working tree. The developer agent MUST
-recognize this trigger, load the persona, and spawn a deputy sub-agent
-under the attributed identity `<provider>(deputy:<model-id>)`.
+The deputy is invoked either by **direct human role assignment** —
+the human telling an agent in the working tree "you are the deputy" —
+or by the trigger phrase **`> Start the deputy agent workflow`**
+issued to whichever developer agent is currently driving the tree. In
+either case the receiving agent MUST load `agents/deputy/persona.md`
+end-to-end and immediately self-identify under the attributed identity
+`<provider>(deputy:<model-id>)` for all subsequent attribution. Direct
+human assignment is the primary path during early bring-up of a fresh
+checkout, when no developer agent is yet driving; the trigger phrase
+is the standard path once a developer is established.
 
 Any agent or human MAY propose constitutional amendments via the normal
 amendment procedure above, but the deputy is the formal owner of

@@ -1,0 +1,116 @@
+{
+  "name": "agent-arena",
+  "displayName": "Agent Arena",
+  "description": "Orchestration engine for managing multiple autonomous agents inside VS Code",
+  "version": "0.0.1",
+  "publisher": "jdylanmc",
+  "license": "MIT",
+  "private": true,
+  "author": "Dylan McCurry",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jdylanmc/agent-arena.git",
+    "directory": "extension"
+  },
+  "type": "module",
+  "engines": {
+    "vscode": "^1.95.0",
+    "node": ">=20.0.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:agentArenaPrimaryView",
+    "onCommand:agent-arena.openAgent",
+    "onCommand:agent-arena.openPrimaryAgent",
+    "onCommand:agent-arena.toggleYolo",
+    "onCommand:agent-arena.showTraceLog"
+  ],
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentArena",
+          "title": "Agent Arena",
+          "icon": "icons/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentArena": [
+        {
+          "id": "agentArenaPrimaryView",
+          "name": "Primary Agent",
+          "type": "tree"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agent-arena.openAgent",
+        "title": "Agent Arena: Open Agent"
+      },
+      {
+        "command": "agent-arena.openPrimaryAgent",
+        "title": "Agent Arena: Open Primary Agent"
+      },
+      {
+        "command": "agent-arena.toggleYolo",
+        "title": "Agent Arena: Toggle Yolo"
+      },
+      {
+        "command": "agent-arena.showTraceLog",
+        "title": "Agent Arena: Show Trace Log"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Arena",
+      "properties": {
+        "agentArena.primaryAgent.model": {
+          "type": "string",
+          "default": "",
+          "description": "Optional model id for the primary agent (e.g. 'gpt-5', 'claude-sonnet-4.5'). Leave empty to let the Copilot SDK pick the default model the signed-in user is entitled to. If you set a model the SDK doesn't recognize for your account, the extension will retry without the model and surface a warning in the terminal."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist && rimraf --glob \"*.vsix\"",
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
+    "launch": "npm run build && node scripts/launch.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vscode-test",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern node_modules",
+    "lint:fix": "eslint . --fix --ignore-pattern dist --ignore-pattern node_modules",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "npm run clean && npm run build",
+    "postinstall": "node scripts/patch-vscode-jsonrpc.mjs"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.1.8"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^25.2.0",
+    "@types/vscode": "^1.95.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.27.0",
+    "eslint": "^9.0.0",
+    "mocha": "^10.7.0",
+    "prettier": "^3.8.1",
+    "rimraf": "^6.1.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.0.18"
+  }
+}

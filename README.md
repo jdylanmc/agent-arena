@@ -28,7 +28,7 @@ The authoritative documents are:
 Use these slash commands inside a Spec Kit-aware coding agent:
 
 1. `/speckit.constitution` — review or amend the constitution.
-2. `/speckit.specify` — create a feature spec on a numbered branch.
+2. `/speckit.specify` — create a feature spec on a timestamp-prefixed branch (`YYYYMMDD-HHMMSS-slug` per `.specify/extensions/git/git-config.yml`).
 3. `/speckit.clarify` — de-risk ambiguous areas (optional).
 4. `/speckit.plan` — produce an implementation plan.
 5. `/speckit.tasks` — generate actionable, test-first tasks.
