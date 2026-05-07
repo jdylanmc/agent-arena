@@ -151,10 +151,9 @@ export class FakeSdkAdapter implements SdkAdapter {
      *  Event shape mirrors `@github/copilot-sdk` (per CD-07): each event has
      *  `{ id, timestamp, parentId, type, data: {...} }` with the
      *  per-`type` data fields the SDK uses (`deltaContent`, `messageId`,
-     *  `content`). The PrimaryAgentPanel reads `event.data.deltaContent`
-     *  for streaming chunks and `event.data.content` for the final
-     *  message — same code path for the real CopilotSdkAdapter and this
-     *  Fake. */
+     *  `content`). The Agent reads `event.data.deltaContent` for streaming
+     *  chunks and `event.data.content` for the final message — same code
+     *  path for the real CopilotSdkAdapter and this Fake. */
     triggerStreamingResponse(sessionId: string, chunks: string[]): void {
         const state = this.requireSession(sessionId);
         const messageId = `msg-${Date.now()}`;

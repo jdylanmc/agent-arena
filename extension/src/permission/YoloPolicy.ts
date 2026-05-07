@@ -27,7 +27,7 @@ export class YoloPolicy implements PermissionPolicy {
             payload: {
                 decision: "allow",
                 source: "yolo",
-                toolName: ctx.invocation?.toolName ?? ctx.request?.toolName,
+                kind: ctx.request?.kind ?? "unknown",
             },
         });
         return { kind: "allow", reason: "yolo" };

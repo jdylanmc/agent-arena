@@ -72,7 +72,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     const yoloStore = new YoloStore(context.workspaceState);
     const yoloStatusBar = new YoloStatusBar(yoloStore, emitter, PRIMARY_AGENT_ID);
-    context.subscriptions.push(yoloStatusBar);
 
     const registry = new AgentRegistry();
     const panelManager = new AgentPanelManager({
@@ -80,7 +79,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extensionUri: context.extensionUri,
         emitter,
     });
-    context.subscriptions.push(panelManager);
 
     activation = {
         emitter,
@@ -215,6 +213,14 @@ async function ensurePrimaryAgent(context: vscode.ExtensionContext): Promise<voi
         getYolo: (id) => activation!.yoloStore.get(id),
     });
 
+    // FR-013 — read the configured model for the primary agent. Empty
+    // string is treated as "use SDK default". The agent forwards this
+    // into createSession({model}); future specs may replace this with
+    // a per-agent model selection UI without changing the Agent.
+    const configuredModel = vscode.workspace
+        .getConfiguration("agentArena")
+        .get<string>("primaryAgent.model");
+
     const agentOpts: ConstructorParameters<typeof Agent>[0] = {
         id: PRIMARY_AGENT_ID,
         displayName: PRIMARY_AGENT_DISPLAY_NAME,
@@ -227,6 +233,9 @@ async function ensurePrimaryAgent(context: vscode.ExtensionContext): Promise<voi
         emitter: activation.emitter,
     };
     if (sel.auth?.login !== undefined) agentOpts.adapterLogin = sel.auth.login;
+    if (configuredModel !== undefined && configuredModel.length > 0) {
+        agentOpts.model = configuredModel;
+    }
 
     const agent = new Agent(agentOpts);
     activation.primaryAgent = agent;

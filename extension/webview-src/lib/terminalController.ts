@@ -14,7 +14,7 @@
  *  shape (write/writeln/clear/focus). Tests can substitute a fake.
  *--------------------------------------------------------------------------------------------*/
 
-import type { XtermApi } from "../components/XtermTerminal.js";
+import type { XtermApi } from "../components/XtermTerminal-types.js";
 
 const ANSI = {
     reset: "\x1b[0m",
@@ -97,11 +97,20 @@ export class TerminalController {
         this.write(chunk);
     }
 
-    /** Final-message marker. The deltas already wrote everything — we just
-     *  emit a newline so the next prompt lands on a fresh line. */
-    onAssistantFinal(): void {
+    /** Final-message marker. When deltas streamed first, the text was
+     *  already drawn — we just emit a CRLF so the next prompt starts on
+     *  a fresh line. When streaming was disabled (FR-012 honored only
+     *  for the real Copilot adapter; the user's launch path may opt out)
+     *  the SDK skips deltas and emits a single `assistant.message` with
+     *  the full content; in that case we render `text` here so the user
+     *  sees something. */
+    onAssistantFinal(text?: string): void {
         if (this.isStreaming) {
             this.write(CRLF);
+            return;
+        }
+        if (text !== undefined && text.length > 0) {
+            this.write(`${text}${CRLF}`);
         }
     }
 
@@ -189,18 +198,20 @@ export class TerminalController {
     }
 
     /** Replay a transcript (CD-11 §6 hybrid). Called from `agent.bootstrap`
-     *  when the panel re-attaches to a running agent. Each prior turn's
-     *  chunks are written into xterm followed by a CRLF, then the next
-     *  prompt is drawn. */
+     *  when the panel re-attaches to a running agent. For each prior turn
+     *  we prefer the consolidated `final` text when it's present (the
+     *  assembled `assistant.message`); otherwise we replay the streaming
+     *  chunks. After all turns render, we draw a fresh prompt. */
     replayTranscript(
         transcript: ReadonlyArray<{ turnId: string; chunks: string[]; final?: string | undefined }>,
     ): void {
         for (const turn of transcript) {
-            for (const chunk of turn.chunks) {
-                this.write(chunk);
-            }
-            if (turn.final !== undefined && turn.final.length > 0 && turn.chunks.length === 0) {
+            if (turn.final !== undefined && turn.final.length > 0) {
                 this.write(turn.final);
+            } else {
+                for (const chunk of turn.chunks) {
+                    this.write(chunk);
+                }
             }
             this.write(CRLF);
         }

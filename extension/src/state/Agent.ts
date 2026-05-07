@@ -68,6 +68,9 @@ export interface AgentOptions {
     yoloStore: YoloStore;
     policyResolver: PolicyResolver;
     emitter: CanonicalEventEmitter;
+    /** Optional model override resolved from `agentArena.primaryAgent.model`
+     *  (FR-013). When undefined the SDK picks its default. */
+    model?: string;
 }
 
 export class Agent implements vscode.Disposable {
@@ -82,10 +85,15 @@ export class Agent implements vscode.Disposable {
     private readonly bannerSubtitle: string;
     private readonly adapterKind: "copilot" | "fake-demo";
     private readonly adapterLogin?: string;
+    private readonly model?: string;
 
     private status: AgentStatus = "idle";
     private session: SdkSessionHandle | undefined;
     private currentTurnId: string | undefined;
+    /** correlation_id from the originating webview message that started the
+     *  current turn. Forwarded into every downstream EI-1 event so the
+     *  prompt → SDK → response chain is auditable (CD-04). */
+    private currentCorrelationId: string | undefined;
     private readonly transcript: TurnEntry[] = [];
     private readonly sdkSubscriptions: vscode.Disposable[] = [];
     private readonly yoloSubscription: vscode.Disposable;
@@ -122,6 +130,7 @@ export class Agent implements vscode.Disposable {
         this.bannerSubtitle = opts.bannerSubtitle;
         this.adapterKind = opts.adapterKind;
         if (opts.adapterLogin !== undefined) this.adapterLogin = opts.adapterLogin;
+        if (opts.model !== undefined && opts.model.length > 0) this.model = opts.model;
 
         // Yolo state is owned by YoloStore; the Agent subscribes so
         // mutations from any surface (status-bar click, slash command,
@@ -160,26 +169,36 @@ export class Agent implements vscode.Disposable {
 
     /** Submit a new prompt. Lazy-creates the SDK session on first call.
      *  Wires SDK event subscriptions on session creation; subsequent
-     *  prompts reuse the same session + subscriptions. */
-    async submitPrompt(prompt: string): Promise<void> {
+     *  prompts reuse the same session + subscriptions.
+     *
+     *  `correlationId` is the originating webview message's CD-04 envelope
+     *  id — forwarded through every downstream EI-1 event so the
+     *  prompt → SDK → response chain is auditable. When omitted (e.g.,
+     *  the slash-command / status-bar paths once they land) we mint a
+     *  fresh id at the head of the chain. */
+    async submitPrompt(prompt: string, correlationId?: string): Promise<void> {
         const trimmed = prompt.trim();
         if (trimmed.length === 0) return;
+
+        const corr = correlationId ?? mintCorrelationId();
 
         this.emitter.emitNew({
             level: "info",
             event: EVENT_NAMES.AA_AGENT_PROMPT_SUBMITTED,
             agent_id: this.id,
+            correlation_id: corr,
             payload: { promptPreview: trimmed.slice(0, 100), promptLength: trimmed.length },
         });
 
         try {
-            await this.ensureSession();
+            await this.ensureSession(corr);
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
             this.emitter.emitNew({
                 level: "error",
                 event: EVENT_NAMES.AA_AGENT_SESSION_ENSURE_FAILED,
                 agent_id: this.id,
+                correlation_id: corr,
                 payload: { error: message },
             });
             this.transitionStatus("error");
@@ -190,6 +209,7 @@ export class Agent implements vscode.Disposable {
 
         const turnId = mintMessageId();
         this.currentTurnId = turnId;
+        this.currentCorrelationId = corr;
         this.transcript.push({ turnId, chunks: [] });
         this.transitionStatus("running");
 
@@ -197,14 +217,16 @@ export class Agent implements vscode.Disposable {
             level: "info",
             event: EVENT_NAMES.AA_AGENT_SEND_STARTED,
             agent_id: this.id,
+            correlation_id: corr,
             payload: { turnId },
         });
         try {
-            await this.session.send({ prompt: trimmed, mode: "enqueue" } as never);
+            await this.session.send({ prompt: trimmed, mode: "enqueue" });
             this.emitter.emitNew({
                 level: "info",
                 event: EVENT_NAMES.AA_AGENT_SEND_RETURNED,
                 agent_id: this.id,
+                correlation_id: corr,
                 payload: { turnId },
             });
         } catch (err: unknown) {
@@ -213,6 +235,7 @@ export class Agent implements vscode.Disposable {
                 level: "error",
                 event: EVENT_NAMES.AA_AGENT_SEND_FAILED,
                 agent_id: this.id,
+                correlation_id: corr,
                 payload: { turnId, error: message },
             });
             this.transitionStatus("error");
@@ -269,66 +292,103 @@ export class Agent implements vscode.Disposable {
     //  Internals
     // -----------------------------------------------------------------------
 
-    private async ensureSession(): Promise<void> {
+    private async ensureSession(correlationId: string): Promise<void> {
         if (this.session) return;
 
         this.transitionStatus("connecting");
 
         const sessionId = mintSessionId(this.id);
-        const correlationId = mintCorrelationId();
         const policyResolver = this.policyResolver;
+        const sessionCorrelationId = correlationId;
 
         this.emitter.emitNew({
             level: "info",
             event: EVENT_NAMES.AA_AGENT_SESSION_ENSURE_STARTED,
             agent_id: this.id,
-            payload: { sessionId },
+            correlation_id: sessionCorrelationId,
+            payload: { sessionId, model: this.model },
         });
 
-        const handle = await this.sdk.createSession({
+        // Build createSession opts. `streaming: true` is required for
+        // `assistant.message_delta` events to flow (FR-012); without it
+        // the SDK only emits the final `assistant.message`. `model`
+        // honors `agentArena.primaryAgent.model` (FR-013); undefined
+        // lets the SDK pick its default.
+        const sessionOpts: Parameters<typeof this.sdk.createSession>[0] = {
             sessionId,
             workingDirectory: this.workingDirectory,
+            streaming: true,
             // FR-019 / R-06 — resolved per-invocation so a yolo toggle
             // takes effect on the next tool call without restarting the
-            // session.
-            onPermissionRequest: async (
-                request: { toolName?: string; summary?: string } & Record<string, unknown>,
-            ): Promise<{ kind: "approved" | "denied"; reason?: string }> => {
+            // session. Returns the SDK's `PermissionRequestResult` union
+            // (`approved` / `denied-interactively-by-user` / etc.) — NOT
+            // the made-up `{kind:"denied"}` shape we used in the
+            // adversarial-review baseline.
+            onPermissionRequest: async (request, _invocation) => {
                 const policy = policyResolver.forAgent(this.id);
-                const decision = await policy.decide({
-                    agentId: this.id,
-                    sessionId,
-                    correlationId,
-                    request: request as never,
-                    invocation: { toolName: request?.toolName ?? "" } as never,
-                });
-                if (decision.kind === "allow") {
-                    return decision.reason !== undefined
-                        ? { kind: "approved", reason: decision.reason }
-                        : { kind: "approved" };
+                let decision;
+                try {
+                    decision = await policy.decide({
+                        agentId: this.id,
+                        sessionId,
+                        correlationId: sessionCorrelationId,
+                        request,
+                    });
+                } catch (err: unknown) {
+                    // Per FR-019 contract: a policy MUST NOT throw, but if
+                    // one does we deny safely and surface the error to
+                    // the EI-1 log (catalog'd as
+                    // `aa.permission.policy_error.v1`).
+                    this.emitter.emitNew({
+                        level: "error",
+                        event: EVENT_NAMES.AA_PERMISSION_POLICY_ERROR,
+                        agent_id: this.id,
+                        correlation_id: sessionCorrelationId,
+                        payload: {
+                            error: err instanceof Error ? err.message : String(err),
+                            kind:
+                                typeof (request as { kind?: unknown }).kind === "string"
+                                    ? (request as { kind: string }).kind
+                                    : "unknown",
+                        },
+                    });
+                    return {
+                        kind: "denied-interactively-by-user",
+                        feedback: "policy_error",
+                    };
                 }
+                if (decision.kind === "allow") return { kind: "approved" };
                 if (decision.kind === "deny") {
-                    return { kind: "denied", reason: decision.reason };
+                    return {
+                        kind: "denied-interactively-by-user",
+                        feedback: decision.reason,
+                    };
                 }
-                return { kind: "denied", reason: "policy_returned_ask" };
+                // `ask` — no interactive surface available at the policy
+                // level, so deflect via the SDK's "no approval rule and
+                // couldn't ask" deny so the CLI doesn't loop on the
+                // request.
+                return { kind: "denied-no-approval-rule-and-could-not-request-from-user" };
             },
-        } as never);
+        };
+        if (this.model !== undefined) sessionOpts.model = this.model;
+
+        const handle = await this.sdk.createSession(sessionOpts);
         this.session = handle;
 
         this.emitter.emitNew({
             level: "info",
             event: EVENT_NAMES.AA_AGENT_SESSION_CREATED,
             agent_id: this.id,
-            payload: { sessionId },
+            correlation_id: sessionCorrelationId,
+            payload: { sessionId, model: this.model },
         });
 
         // SDK event wiring. Both CopilotSdkAdapter (real) and FakeSdkAdapter
         // emit the SDK shape: `{ type, data: { deltaContent | content | ... } }`.
         type SdkEventBase = { type: string; data?: Record<string, unknown> };
-        type AssistantContentEvent = {
-            type: string;
-            data?: { deltaContent?: string; content?: string };
-        };
+        type AssistantDeltaEvent = { type: string; data?: { deltaContent?: string } };
+        type AssistantMessageEvent = { type: string; data?: { content?: string } };
         type SessionErrorEvent = {
             type: string;
             data?: { errorType?: string; message?: string };
@@ -342,24 +402,24 @@ export class Agent implements vscode.Disposable {
                 level: "info",
                 event: EVENT_NAMES.AA_AGENT_SDK_EVENT,
                 agent_id: this.id,
+                correlation_id: this.currentCorrelationId ?? sessionCorrelationId,
                 payload: { sdkEventType: event?.type ?? "<unknown>" },
             });
         };
 
         this.sdkSubscriptions.push(
-            handle.on<AssistantContentEvent>("assistant.message_delta", (event) => {
+            handle.on<AssistantDeltaEvent>("assistant.message_delta", (event) => {
                 logSdkEvent(event);
                 this.handleAssistantDelta(event);
             }),
         );
+        // NOTE: `assistant.streaming_delta` is intentionally NOT subscribed
+        // — its payload is `{ totalResponseSizeBytes }`, a progress
+        // counter, not content. Reading `data.deltaContent` off it (as
+        // the pre-fix scaffold did) found nothing and just spammed the
+        // EI-1 log with empty events.
         this.sdkSubscriptions.push(
-            handle.on<AssistantContentEvent>("assistant.streaming_delta", (event) => {
-                logSdkEvent(event);
-                this.handleAssistantDelta(event);
-            }),
-        );
-        this.sdkSubscriptions.push(
-            handle.on<AssistantContentEvent>("assistant.message", (event) => {
+            handle.on<AssistantMessageEvent>("assistant.message", (event) => {
                 logSdkEvent(event);
                 this.handleAssistantFinal(event);
             }),
@@ -380,11 +440,9 @@ export class Agent implements vscode.Disposable {
         this.transitionStatus("idle");
     }
 
-    private handleAssistantDelta(event: {
-        data?: { deltaContent?: string; content?: string };
-    }): void {
+    private handleAssistantDelta(event: { data?: { deltaContent?: string } }): void {
         if (!this.currentTurnId) return;
-        const chunk = event?.data?.deltaContent ?? event?.data?.content ?? "";
+        const chunk = event?.data?.deltaContent ?? "";
         if (!chunk) return;
         const turn = this.transcript[this.transcript.length - 1];
         if (turn?.turnId === this.currentTurnId) {
@@ -405,6 +463,7 @@ export class Agent implements vscode.Disposable {
 
     private handleSessionIdle(): void {
         this.currentTurnId = undefined;
+        this.currentCorrelationId = undefined;
         this.transitionStatus("idle");
     }
 

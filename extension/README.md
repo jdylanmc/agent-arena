@@ -15,35 +15,42 @@ npm run launch     # builds host + webview, opens dev VS Code with the extension
 ```
 
 `npm run launch` opens a fresh VS Code window with this folder loaded as a
-**dev extension**. The extension auto-opens the **Primary Agent** panel
-beside the welcome page on first activation. Click the **A** icon in the
-Activity Bar to re-open the panel after dismissing it.
+**dev extension**. Click the **A** icon in the Activity Bar to mount the
+**Agent Arena** TreeView; the *Main Developer* row's first reveal opens
+the agent panel automatically. Closing the panel does not disconnect the
+agent — clicking the row again reveals the same panel and replays the
+in-flight transcript (CD-11).
 
 ## What you'll see
 
-The visual contract is captured at
-[`prototype/swarm-primary.png`](../prototype/swarm-primary.png) and codified
-as **CD-08** in
-[`specs/20260506-144809-scaffold-application/spec.md`](../specs/20260506-144809-scaffold-application/spec.md).
-The primary-agent surface is a `vscode.WebviewPanel` opened in the editor
-area (CD-07) with five layers:
+The activity-bar **A** icon opens an **Agent Arena** TreeView listing the
+registered agents (today: just *Main Developer*). Clicking the row reveals
+that agent's panel in the editor area; closing the panel does **not**
+disconnect the agent — the SDK session keeps streaming, and re-opening the
+panel replays the in-flight transcript so the user picks up mid-stream.
+This is the CD-11 *agent-window* model (panel as render surface, Agent as
+persistent state) and the keel for multi-agent / background-agent work in
+follow-up specs.
 
-1. **Top brand bar** — *Agent Arena* with the `A` icon.
-2. **Tabs row** — `Swarm | Workflow`. *Swarm* is active; *Workflow* renders a
-   stub placeholder until a future spec ships the editor.
-3. **Left sidebar** — `PRIMARY AGENT` section with one entry (*Main
-   Developer*); shows avatar, status, and a colored status dot. The
-   `BACKGROUND AGENTS` section from the prototype is reserved for a future
-   spec.
-4. **Per-agent header** — avatar + `>_ Main Developer` + `Running` /
+The per-agent panel is a `vscode.WebviewPanel` (CD-07) with three layers:
+
+1. **Per-agent header** — avatar + `>_ Main Developer` + `Running` /
    `Idle` / `Connecting` / `Error` + cwd + adapter status + a settings
    gear (non-functional in this scaffold).
-5. **Terminal** — bespoke `@xterm/xterm` renderer inside the React shell
+2. **Terminal** — bespoke `@xterm/xterm` renderer inside the React shell
    (CD-07). Accepts direct keystrokes with ↑/↓ history, slash commands
-   (`/help`, `/yolo on|off`, `/clear`), and streams the agent's response.
-6. **Bottom command input** — convenience text field with submit-on-Enter
+   (`/help`, `/yolo on|off`, `/clear`), and streams the agent's response
+   in real time (`streaming: true` on the SDK session per FR-012).
+3. **Bottom command input** — convenience text field with submit-on-Enter
    and a paper-airplane send button. Submissions flow through the same
    `TerminalController` code path as direct xterm typing.
+
+When the agent invokes a tool (shell command, file write/read, URL fetch,
+MCP / custom tool, memory save), the `PromptUserPolicy` modal renders the
+SDK's `PermissionRequest` per-kind: e.g., a shell request shows
+**Run shell command? · `$ echo howdy` · echo something to stdout**.
+Approve once and the CLI proceeds. Toggle yolo via the status-bar item
+or `/yolo on` to bypass for the rest of the session.
 
 ## Adapter modes
 
@@ -117,49 +124,56 @@ round-trip, and the `.vsix` SHA.
 
 The extension host (`src/`) is a Node.js process inside VS Code's Electron
 runtime. It owns the `SdkAdapter` instance (the seam to
-`@github/copilot-sdk`), the canonical EI-1 `EventEmitter`, the
-`PrimaryAgentPanel` (a `vscode.WebviewPanel` orchestrator per CD-07), and
-the activity-bar TreeView placeholder. The webview (`webview-src/`) is a
-sandboxed React + Tailwind app that renders the prototype-based UI shell
-from CD-08 with `@xterm/xterm` as the terminal renderer. Host and webview
-communicate **only** through the versioned postMessage envelope defined
-in
+`@github/copilot-sdk`), the canonical EI-1 `EventEmitter`, and the
+`AgentRegistry` + `AgentPanelManager` keel from CD-11. Each `Agent` owns
+one SDK session, its transcript buffer, status, and yolo binding; the
+`AgentPanel` is a render-only `vscode.WebviewPanel` (CD-07) that
+subscribes to its `Agent` on reveal and unsubscribes on close — the agent
+keeps streaming and re-opening the panel replays the in-flight
+transcript. The activity-bar TreeView is populated from the registry and
+fires `agent-arena.openAgent` on row click, idempotently revealing the
+existing panel or creating one. The webview (`webview-src/`) is a
+sandboxed React + Tailwind app rendering only the per-agent header,
+xterm.js terminal, and bottom command input — no in-panel sidebar, no
+tabs (the activity-bar TreeView IS the navigation per CD-11). Host and
+webview communicate **only** through the versioned postMessage envelope
+defined in
 [`contracts/webview-protocol.md`](../specs/20260506-144809-scaffold-application/contracts/webview-protocol.md);
-both sides validate every envelope at runtime via Zod. SDK events
-(OpenTelemetry from the bundled CLI) and extension-emitted events flow
-through one canonical JSONL log per CD-01. Permission decisions go
-through `PermissionPolicy` (with `YoloPolicy` and `PromptUserPolicy` as
-default implementations) resolved per agent on every tool invocation
-(FR-019 / R-06), so a yolo toggle takes effect on the next tool call
-without restarting the session.
+both sides validate every envelope at runtime via Zod, and the originating
+envelope's `correlation_id` propagates into every downstream EI-1 event so
+the prompt → SDK → response chain is auditable end-to-end (CD-04).
+Permission decisions go through `PermissionPolicy` resolved per agent on
+every tool invocation (FR-019 / R-06): `PromptUserPolicy` renders a
+VS Code modal with per-kind copy built from the SDK's `PermissionRequest`
+(`shell` → command + intention; `write` → file + diff; `read`, `url`,
+`mcp`, `custom-tool`, etc.); `YoloPolicy` auto-approves while still
+emitting the canonical audit event. A yolo toggle takes effect on the
+next tool call without restarting the session.
 
 ## Layout
 
 ```
 extension/
 ├── src/                     # extension host (esbuild → dist/extension.cjs)
-│   ├── extension.ts         # activate/deactivate
+│   ├── extension.ts         # activate/deactivate; lazy adapter selection
 │   ├── activate/            # command + view registration
-│   ├── panel/               # PrimaryAgentPanel (WebviewPanel orchestrator, CD-07)
+│   ├── panel/               # AgentPanel (render-only WebviewPanel) + AgentPanelManager
+│   ├── state/               # Agent (CD-11 keel), AgentRegistry, YoloStore + status-bar item
 │   ├── sdk/                 # SdkAdapter interface + CopilotSdkAdapter + FakeSdkAdapter + selectAdapter
 │   ├── permission/          # PermissionPolicy + YoloPolicy + PromptUserPolicy + DefaultPolicyResolver
 │   ├── protocol/            # MessageEnvelope (Zod) + per-type schemas
 │   ├── telemetry/           # canonical event shape + EventEmitter
-│   ├── harness/             # AgentArenaHarness shape + serializer
-│   ├── state/               # YoloStore (workspaceState) + status-bar item
 │   ├── webview/             # MessageRouter (Zod-validated post-message dispatch)
 │   └── shared/              # id minting helpers
 ├── webview-src/             # React + Tailwind webview (vite → dist/webview/)
-│   ├── App.tsx              # CD-08 shell: AppHeader / Tabs / Sidebar / AgentPaneHeader / xterm / CommandInput
+│   ├── App.tsx              # AgentPaneHeader + xterm + CommandInput
 │   ├── main.tsx
-│   ├── components/          # AppHeader, TabsRow, Sidebar, AgentPaneHeader, CommandInput, XtermTerminal, WorkflowStub
-│   ├── lib/                 # TerminalController (input buffer, history, slash commands)
+│   ├── components/          # AgentPaneHeader, CommandInput, XtermTerminal (+ XtermTerminal-types)
+│   ├── lib/                 # TerminalController (input buffer, history, slash commands, replay)
 │   ├── protocol/            # build-time mirror of src/protocol/
 │   └── styles/              # tailwind.css
 ├── test/
-│   └── unit/                # vitest
-├── tests/
-│   └── harnesses/           # EI-2 harness fixtures (constitution.md:584-588)
+│   └── unit/                # vitest (host + webview unit tests under one config)
 ├── icons/                   # activity-bar.svg
 ├── scripts/
 │   └── launch.mjs           # absolute-path dev-host launcher (Windows-safe)

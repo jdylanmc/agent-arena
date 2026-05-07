@@ -16,7 +16,7 @@
  *  Author attribution: copilot(developer:opus-4.7)
  *--------------------------------------------------------------------------------------------*/
 
-import type { PermissionRequest, ToolInvocation } from "@github/copilot-sdk";
+import type { PermissionRequest } from "@github/copilot-sdk";
 
 /**
  * The output of a policy decision. The scaffold ships exactly the first two
@@ -32,12 +32,21 @@ export type PermissionDecision =
  * Everything a policy needs to decide. The correlationId is the CD-04 envelope
  * id from the originating webview message, so a denial can be traced through
  * both the EI-1 canonical log and the protocol round-trip.
+ *
+ * `request` carries the SDK's `PermissionRequest` verbatim — discriminated by
+ * `kind` (`shell` / `write` / `read` / `mcp` / `url` / `custom-tool`, plus
+ * runtime variants like `memory`). Per-kind fields live on the same object
+ * via the SDK type's `[key: string]: unknown` index signature; policies that
+ * need to reach into them MUST `switch (request.kind)` first and narrow.
+ *
+ * Note: the SDK's `PermissionHandler` callback also receives an `invocation`
+ * argument of shape `{ sessionId: string }`. Since `sessionId` is already
+ * carried at the top level of this context, we don't duplicate it.
  */
 export interface PermissionDecisionContext {
     agentId: string;
     sessionId: string;
     request: PermissionRequest;
-    invocation: ToolInvocation;
     correlationId: string;
 }
 

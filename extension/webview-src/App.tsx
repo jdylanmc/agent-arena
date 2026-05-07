@@ -79,8 +79,8 @@ export function App(): JSX.Element {
         const offDelta = bus.on("assistant.delta", (payload) => {
             controller.onAssistantDelta(payload.chunk);
         });
-        const offFinal = bus.on("assistant.message.final", () => {
-            controller.onAssistantFinal();
+        const offFinal = bus.on("assistant.message.final", (payload) => {
+            controller.onAssistantFinal(payload.text);
         });
         const offState = bus.on("session.state", (payload) => {
             setSessionStatus(

@@ -33,6 +33,7 @@ export const EVENT_NAMES = Object.freeze({
     AA_EXTENSION_DEACTIVATE: "aa.extension.deactivate.v1",
 
     AA_WEBVIEW_OPENED: "aa.webview.opened.v1",
+    AA_WEBVIEW_CLOSED: "aa.webview.closed.v1",
     AA_WEBVIEW_MESSAGE_RECEIVED: "aa.webview.message.received.v1",
     AA_WEBVIEW_MESSAGE_REJECTED: "aa.webview.message.rejected.v1",
 
@@ -44,13 +45,7 @@ export const EVENT_NAMES = Object.freeze({
 
     AA_YOLO_TOGGLED: "aa.yolo.toggled.v1",
 
-    AA_HARNESS_SAVED: "aa.harness.saved.v1",
-    AA_HARNESS_LOADED: "aa.harness.loaded.v1",
-    AA_HARNESS_SESSION_UNRECOVERABLE: "aa.harness.session.unrecoverable.v1",
-
     AA_SDK_CLI_START_FAILED: "aa.sdk.cli.start_failed.v1",
-    AA_SDK_CLI_DEGRADED: "aa.sdk.cli.degraded.v1",
-    AA_SDK_CLI_RESTART_ATTEMPTED: "aa.sdk.cli.restart_attempted.v1",
     AA_SDK_ADAPTER_SELECTED: "aa.sdk.adapter.selected.v1",
     AA_AGENT_PROMPT_SUBMITTED: "aa.agent.prompt.submitted.v1",
     AA_AGENT_SESSION_ENSURE_STARTED: "aa.agent.session.ensure_started.v1",

@@ -20,6 +20,175 @@ Principle II violation and the deputy will flag them.
 
 ### Added
 
+- **Agent test suite (I7)**: `test/unit/state/Agent.test.ts` covers the
+  CD-11 keel — basic snapshot shape, status transitions, transcript
+  accumulation (chunks then assembled final), `streaming: true` /
+  `model` / `correlation_id` plumbing into `createSession`, and the
+  permission shim's per-kind policy delegation + SDK-result mapping
+  (`allow → approved`, `deny → denied-interactively-by-user`, `ask →
+  denied-no-approval-rule-and-could-not-request-from-user`). 13 tests.
+  — copilot(developer:opus-4.7)
+
+- **Replay-transcript test suite (I4)**: `test/unit/webview/replayTranscript.test.ts`
+  covers `TerminalController.onAssistantFinal(text?)` and
+  `replayTranscript(...)` — the two surfaces that drove the "no output
+  in the xterm" symptom from the adversarial review. Tests the
+  text-when-not-streaming path, the prefer-final-over-chunks path, and
+  multi-turn ordering. 9 tests. — copilot(developer:opus-4.7)
+
+- **CopilotSdkAdapter env allowlist test (I3 / E1)**:
+  `test/unit/sdk/CopilotSdkAdapter.env.test.ts` covers `buildSpawnedEnv`
+  — the new explicit-allowlist replacement for the previous
+  `...process.env` spread. Asserts that `GH_TOKEN`, `AWS_*`, `OPENAI_*`,
+  `NPM_TOKEN`, etc. are filtered out and that overrides win over
+  inherited values. 7 tests. — copilot(developer:opus-4.7)
+
+- **`AA_WEBVIEW_CLOSED` event (A7)**: catalog'd alongside
+  `AA_WEBVIEW_OPENED` so `AgentPanel.handlePanelClose` can emit a
+  distinct event instead of misusing OPENED.
+  — copilot(developer:opus-4.7)
+
+### Changed
+
+- **A1 / FR-012 — `streaming: true` on every SDK session**.
+  `Agent.ensureSession` now passes `streaming: true` to
+  `sdk.createSession`, so `assistant.message_delta` events flow as
+  designed. Without this, the SDK only emitted final
+  `assistant.message` events and the user saw nothing in the xterm
+  while the model was working. — copilot(developer:opus-4.7)
+
+- **A2 — render the assistant's final text when streaming was off**.
+  `TerminalController.onAssistantFinal(text?)` now writes
+  `text + CRLF` when no streaming preceded it (when streaming did
+  precede, only a CRLF — the deltas already drew the body). `App.tsx`
+  passes `payload.text` through. The combined effect: the model's
+  output now actually appears in the terminal. — copilot(developer:opus-4.7)
+
+- **A3 — permission modal copy is built per `request.kind`**.
+  `PromptUserPolicy.decide` now `switch`es on the SDK's
+  `PermissionRequest.kind` (`shell` / `write` / `read` / `mcp` / `url`
+  / `custom-tool`, plus `memory` and unknown future kinds) and renders
+  per-kind title + body — e.g., shell shows `$ <fullCommandText>` +
+  intention + warning; write shows fileName + intention + diff
+  preview; read shows path + intention; url shows URL + intention.
+  Replaces the previous broken modal that read invented
+  `request.toolName` / `request.summary` fields and rendered the
+  empty `Agent Arena: allow ?\n\n`. — copilot(developer:opus-4.7)
+
+- **A4 — permission deny path returns the SDK's real result shape**.
+  `Agent`'s `onPermissionRequest` shim now maps internal
+  `PermissionDecision.deny` to `{ kind: "denied-interactively-by-user",
+  feedback }` and `ask` to
+  `{ kind: "denied-no-approval-rule-and-could-not-request-from-user" }`
+  — both members of the SDK's `PermissionRequestResult` union. The
+  previous `{ kind: "denied", reason }` was not in the union and
+  silently failed RPC validation. Allow now returns `{ kind: "approved" }`.
+  — copilot(developer:opus-4.7)
+
+- **A5 / CD-04 — `correlation_id` propagates through the prompt chain**.
+  `MessageRouter.InboundHandler` now receives the envelope and
+  `Agent.submitPrompt(prompt, correlationId?)` accepts the originating
+  envelope's id, forwarding it through every downstream EI-1 emit
+  (`AA_AGENT_PROMPT_SUBMITTED`, `AA_AGENT_SESSION_*`, `AA_AGENT_SEND_*`,
+  `AA_AGENT_SDK_EVENT`, etc.). The audit chain now reflects what the
+  spec promises. — copilot(developer:opus-4.7)
+
+- **A6 — drop `assistant.streaming_delta` subscription**. That event
+  carries `{ totalResponseSizeBytes }` only, not content; the previous
+  handler read non-existent `data.deltaContent` and just spammed the
+  EI-1 log with empty deltas. The single content stream is
+  `assistant.message_delta` (correctly subscribed) +
+  `assistant.message` (final). — copilot(developer:opus-4.7)
+
+- **A9 — `replayTranscript` prefers final over chunks**. When a turn
+  has both, the consolidated final renders; chunks are the fallback.
+  Pre-fix the condition was `final !== undefined && chunks.length === 0`,
+  which dropped the consolidated final whenever both were recorded.
+  — copilot(developer:opus-4.7)
+
+- **A10 / A11 — dispose hygiene**. `AgentPanelManager.dispose` snapshots
+  the panel map and clears it before iterating, so the synchronous
+  `panel.onDidDispose` callback can't mutate a Map mid-walk. The
+  manager and `YoloStatusBar` are no longer pushed to
+  `context.subscriptions` since they're explicitly disposed in
+  `deactivate()` in their required teardown order; double-dispose
+  closed. — copilot(developer:opus-4.7)
+
+- **A12 / FR-013 — read `agentArena.primaryAgent.model` config**.
+  `extension.ts` reads the configured model from
+  `vscode.workspace.getConfiguration("agentArena").get("primaryAgent.model")`
+  and forwards it through `Agent` → `createSession({ model })`.
+  Empty-string and undefined fall through to the SDK default. The
+  setting was declared in `package.json` but never read.
+  — copilot(developer:opus-4.7)
+
+- **A13 — `ResumeSessionConfig` spread order**. Spread the caller's
+  opts first, then apply the default `onPermissionRequest` so a missing
+  key falls through to `sdk.approveAll`; previously the order was
+  inverted and a caller-supplied `undefined` would clobber the default.
+  — copilot(developer:opus-4.7)
+
+- **E1 — env allowlist for spawned Copilot CLI**. `CopilotSdkAdapter`
+  no longer spreads `process.env` into the spawned binary's
+  environment; it forwards an explicit allowlist (`PATH`, `HOME`,
+  `USERPROFILE`, `LANG`, `LC_*`, OS housekeeping like `TEMP`/`PATHEXT`,
+  XDG variables, `TERM`/`COLORTERM`) plus any `COPILOT_*` prefixed key,
+  with caller overrides winning. Closes the leak that was forwarding
+  `GH_TOKEN`, `AWS_*`, `OPENAI_API_KEY`, `NPM_TOKEN`, and arbitrary CI
+  secrets to the child process. — copilot(developer:opus-4.7)
+
+- **H6 — `agent-arena.openAgent` declared in `package.json`**. The
+  canonical command (CD-11 §7) is now in `commands` and
+  `activationEvents`, so the Command Palette discovers it.
+  — copilot(developer:opus-4.7)
+
+- **I2 — permission test fixtures use real SDK kind shapes**. The
+  `PromptUserPolicy.test.ts` and `YoloPolicy.test.ts` fixtures
+  previously cast invented `{ toolName, summary }` shapes as `never` so
+  the typed `PermissionDecisionContext` would accept them — but those
+  fields don't exist on the SDK's `PermissionRequest` union, which is
+  why bug A3 didn't surface despite all 112 tests passing. Fixtures
+  are now built from the real `kind: "shell" | "write" | "read" |
+  "url"` discriminator with per-kind fields, and the suite asserts the
+  modal copy includes the kind-specific details. The same `as never`
+  cast survives only because `[key: string]: unknown` on the SDK type
+  doesn't admit the discriminated members directly through TS's
+  inference. — copilot(developer:opus-4.7)
+
+### Removed
+
+- **B1 — Supervisor / `lifecycle.ts`**. The 122-line `SupervisorState`
+  state machine had zero callers in `src/` and the
+  `aa.sdk.cli.degraded.v1` / `aa.sdk.cli.restart_attempted.v1` events
+  it claimed to drive were never emitted. Catalog entries and the
+  test file removed alongside the module. Re-introduce in a follow-up
+  spec when CLI restart-supervision is actually wired through
+  `CopilotSdkAdapter`. — copilot(developer:opus-4.7)
+
+- **B2 — `harness/` + harness commands**. `AgentArenaHarness`,
+  `serializeHarness`, `EMPTY_HARNESS`, `HarnessedSession`, the
+  `agent-arena.harness.{export,import}` command stubs (which just
+  showed a "not yet implemented" toast), the corresponding entries in
+  `package.json` `commands` + `activationEvents`, and the
+  `AA_HARNESS_*` event-name catalog entries are gone. CD-02 was
+  already withdrawn in CD-12; this completes the removal.
+  — copilot(developer:opus-4.7)
+
+- **B3 / B6 — `permission.respond` + `permission.prompt` protocol
+  surface**. The webview-mediated permission dispatch was superseded
+  by VS Code modal dialogs (CD-07 §6); the no-op handler in
+  `AgentPanel.wireRouter`, the schemas in `protocol/types.ts`, and
+  the `INBOUND_TYPES` / `OUTBOUND_TYPES` entries are removed.
+  — copilot(developer:opus-4.7)
+
+- **B7 — stale `PrimaryAgentPanel` doc references**. The class was
+  replaced by `AgentPanel` in the CD-11 refactor; comments in
+  `FakeSdkAdapter.ts`, `CopilotSdkAdapter.ts`, `SdkAdapter.ts`, and
+  the README's *Layout* + *Architecture* sections are updated to
+  reference the new module names. — copilot(developer:opus-4.7)
+
+### Added
+
 - **CD-08 — prototype-based UI shell**: the React webview now matches
   the layout in [`prototype/swarm-primary.png`](prototype/swarm-primary.png):
   top brand bar, `Swarm | Workflow` tabs, left sidebar with a

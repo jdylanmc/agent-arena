@@ -22,7 +22,6 @@ import type {
     AssistantDeltaSchema,
     AssistantMessageFinalSchema,
     SessionStateSchema,
-    PermissionPromptSchema,
 } from "../protocol/types.js";
 import type { z } from "zod";
 import { mintCorrelationId, mintMessageId } from "../shared/ids.js";
@@ -175,25 +174,26 @@ export class AgentPanel implements vscode.Disposable {
 
     private wireRouter(router: MessageRouter): void {
         router.on("webview.ready", () => this.sendBootstrap());
-        router.on("prompt.submit", async (payload) => {
-            await this.agent.submitPrompt(payload.promptText);
+        router.on("prompt.submit", async (payload, envelope) => {
+            // CD-04 — propagate the originating envelope's correlation_id
+            // through the Agent so every downstream EI-1 event in the
+            // prompt → SDK → response chain shares the same audit id.
+            await this.agent.submitPrompt(payload.promptText, envelope.correlation_id);
         });
         router.on("yolo.set", async (payload) => {
             await this.agent.setYolo(payload.enabled);
-        });
-        router.on("permission.respond", () => {
-            // Permission flow uses VS Code modal dialogs (CD-07 §6); the
-            // webview no longer mediates it. No-op handler kept for
-            // protocol completeness.
         });
     }
 
     private handlePanelClose(): void {
         this.emitter.emitNew({
             level: "info",
-            event: EVENT_NAMES.AA_WEBVIEW_OPENED,
+            event: EVENT_NAMES.AA_WEBVIEW_CLOSED,
             agent_id: this.agent.id,
-            payload: { surface: "WebviewPanel", action: "closed" },
+            payload: {
+                surface: "WebviewPanel",
+                viewType: `${VIEW_TYPE_PREFIX}${this.agent.id}`,
+            },
         });
         this.dispose();
     }
@@ -234,10 +234,6 @@ export class AgentPanel implements vscode.Disposable {
         payload: z.infer<typeof AssistantMessageFinalSchema>,
     ): void;
     private postOutbound(type: "session.state", payload: z.infer<typeof SessionStateSchema>): void;
-    private postOutbound(
-        type: "permission.prompt",
-        payload: z.infer<typeof PermissionPromptSchema>,
-    ): void;
     private postOutbound(
         type: "error",
         payload: { code: string; message: string; recoverable: boolean },

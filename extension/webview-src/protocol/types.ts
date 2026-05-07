@@ -32,10 +32,6 @@ export const YoloSetSchema = z.object({
     enabled: z.boolean(),
     agentId: z.string().min(1),
 });
-export const PermissionRespondSchema = z.object({
-    requestId: z.string().min(1),
-    decision: z.enum(["allow", "deny"]),
-});
 
 // =============================================================================
 // host → webview (outbound to webview)
@@ -50,11 +46,6 @@ export const AssistantMessageFinalSchema = z.object({
     text: z.string(),
     sessionId: z.string().min(1),
     turnId: z.string().min(1),
-});
-export const PermissionPromptSchema = z.object({
-    requestId: z.string().min(1),
-    toolName: z.string().min(1),
-    summary: z.string().min(1),
 });
 export const SessionStateSchema = z.object({
     status: z.enum(["idle", "running", "queued", "error"]),
@@ -99,15 +90,17 @@ export const INBOUND_TYPES = [
     "webview.ready",
     "prompt.submit",
     "yolo.set",
-    "permission.respond",
 ] as const;
 
-/** Outbound (host → webview) message types. */
+/** Outbound (host → webview) message types. Permission UI uses VS Code's
+ *  modal dialogs (CD-07 §6) — there's no in-webview permission surface
+ *  in this scaffold, so `permission.prompt` / `permission.respond` are
+ *  intentionally absent. Future specs that introduce a richer permission
+ *  surface re-add them here. */
 export const OUTBOUND_TYPES = [
     "agent.bootstrap",
     "assistant.delta",
     "assistant.message.final",
-    "permission.prompt",
     "session.state",
     "error",
 ] as const;
@@ -126,11 +119,9 @@ export const MESSAGE_SCHEMAS = {
     "webview.ready": WebviewReadySchema,
     "prompt.submit": PromptSubmitSchema,
     "yolo.set": YoloSetSchema,
-    "permission.respond": PermissionRespondSchema,
     "agent.bootstrap": AgentBootstrapSchema,
     "assistant.delta": AssistantDeltaSchema,
     "assistant.message.final": AssistantMessageFinalSchema,
-    "permission.prompt": PermissionPromptSchema,
     "session.state": SessionStateSchema,
     "error": ErrorMessageSchema,
 } as const satisfies Record<MessageType, z.ZodSchema>;

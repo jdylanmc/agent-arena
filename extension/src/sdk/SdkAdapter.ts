@@ -52,7 +52,7 @@ export interface SdkSessionLifecycle {
  *
  *  The `on<E>` signature uses a relaxed `{ type: string }` bound rather
  *  than the SDK's full event union. Two reasons:
- *    - Consumers (PrimaryAgentPanel, future agent surfaces) MUST NOT
+ *    - Consumers (Agent and any future per-agent surfaces) MUST NOT
  *      import `@github/copilot-sdk` runtime types per the
  *      no-restricted-imports rule, so they can't supply a SessionEvent
  *      narrowing type argument.

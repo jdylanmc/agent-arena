@@ -34,14 +34,8 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import "@xterm/xterm/css/xterm.css";
 
-export interface XtermApi {
-    write(data: string): void;
-    writeln(data: string): void;
-    clear(): void;
-    focus(): void;
-    findNext(query: string): boolean;
-    serialize(): string;
-}
+import type { XtermApi } from "./XtermTerminal-types.js";
+export type { XtermApi } from "./XtermTerminal-types.js";
 
 export interface XtermTerminalProps {
     onData: (data: string) => void;

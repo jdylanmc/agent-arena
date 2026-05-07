@@ -54,21 +54,6 @@ describe("per-type schemas", () => {
         ).toBe(true);
     });
 
-    it("permission.respond restricts decision to allow|deny", () => {
-        expect(
-            MESSAGE_SCHEMAS["permission.respond"].safeParse({ requestId: "r1", decision: "maybe" })
-                .success,
-        ).toBe(false);
-        expect(
-            MESSAGE_SCHEMAS["permission.respond"].safeParse({ requestId: "r1", decision: "allow" })
-                .success,
-        ).toBe(true);
-        expect(
-            MESSAGE_SCHEMAS["permission.respond"].safeParse({ requestId: "r1", decision: "deny" })
-                .success,
-        ).toBe(true);
-    });
-
     it("session.state restricts status to a known enum", () => {
         expect(
             MESSAGE_SCHEMAS["session.state"].safeParse({ status: "running", sessionId: "s1" }).success,

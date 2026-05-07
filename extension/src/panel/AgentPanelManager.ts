@@ -23,6 +23,12 @@ export class AgentPanelManager implements vscode.Disposable {
     private readonly registry: AgentRegistry;
     private readonly extensionUri: vscode.Uri;
     private readonly emitter: CanonicalEventEmitter;
+    /** Set during `dispose()` so the synchronous `panel.onDidDispose`
+     *  callback (fired by the underlying VS Code panel teardown) does
+     *  not mutate `this.panels` mid-iteration. Without this guard, the
+     *  for…of below would walk a Map being modified by its own callback
+     *  — a Heisenbug waiting to surface under any future refactor. */
+    private isDisposing = false;
 
     constructor(opts: AgentPanelManagerOptions) {
         this.registry = opts.registry;
@@ -51,6 +57,7 @@ export class AgentPanelManager implements vscode.Disposable {
         });
         // When the user closes the tab, drop our reference. Agent stays.
         panel.onDidDispose(() => {
+            if (this.isDisposing) return;
             this.panels.delete(agentId);
         });
         this.panels.set(agentId, panel);
@@ -60,13 +67,19 @@ export class AgentPanelManager implements vscode.Disposable {
     /** Disposes every live panel. Agents survive (per CD-11 §6) — only
      *  the WebviewPanels go. Called only on extension deactivate. */
     dispose(): void {
-        for (const panel of this.panels.values()) {
+        this.isDisposing = true;
+        // Snapshot the values so the synchronous onDidDispose callback
+        // can't surprise us even if a future refactor turns the guard
+        // off — we never iterate the Map directly during teardown.
+        const panels = Array.from(this.panels.values());
+        this.panels.clear();
+        for (const panel of panels) {
             try {
                 panel.dispose();
             } catch {
                 /* ignore */
             }
         }
-        this.panels.clear();
+        this.isDisposing = false;
     }
 }

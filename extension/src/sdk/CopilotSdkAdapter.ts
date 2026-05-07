@@ -25,6 +25,13 @@
  *  work around this we explicitly point `cliPath` at the OS-specific
  *  pre-built binary that ships in `@github/copilot-<platform>-<arch>`,
  *  so the SDK spawns the binary directly and skips its Node fallback.
+ *
+ *  Environment forwarding: we deliberately do NOT spread `process.env`
+ *  into the spawned CLI's environment. The extension host's env
+ *  contains the user's full shell environment (GH_TOKEN, AWS keys,
+ *  arbitrary CI secrets, …) — there's no reason the Copilot CLI needs
+ *  any of that. We forward an explicit allowlist of variables the CLI
+ *  legitimately needs (PATH, locale, COPILOT_*, OS-standard variables).
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from "node:path";
@@ -54,6 +61,80 @@ async function loadSdkModule(): Promise<SdkModule> {
         cachedSdkModule = await import("@github/copilot-sdk");
     }
     return cachedSdkModule;
+}
+
+/** Environment variables forwarded to the spawned Copilot CLI. The
+ *  allowlist is conservative: PATH for binary lookup, HOME/USERPROFILE
+ *  + APPDATA/LOCALAPPDATA + XDG_* for the CLI's per-user state, locale
+ *  variables for date/number formatting, OS housekeeping (TEMP/TMP,
+ *  PATHEXT, COMSPEC, SYSTEMROOT, OS) so child-process resolution works
+ *  on Windows, and an explicit COPILOT_* prefix for any CLI-specific
+ *  knobs. Anything else (GH_TOKEN, AWS_*, arbitrary CI secrets) stays
+ *  in the extension host.
+ *
+ *  Exported for testing — no other module should need to read it. */
+export const ENV_ALLOWLIST: ReadonlySet<string> = new Set([
+    "PATH",
+    "HOME",
+    "USERPROFILE",
+    "USERNAME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "LANG",
+    "LANGUAGE",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LC_MESSAGES",
+    "TZ",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "OS",
+    "PROCESSOR_ARCHITECTURE",
+    "PROCESSOR_IDENTIFIER",
+    "NUMBER_OF_PROCESSORS",
+    "XDG_CACHE_HOME",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+    "XDG_RUNTIME_DIR",
+    "XDG_STATE_HOME",
+    "TERM",
+    "COLORTERM",
+]);
+
+/** Build the env passed to the spawned CLI. Allowlist + COPILOT_* prefix
+ *  + any caller-supplied overrides (e.g., COPILOT_HOME). Caller overrides
+ *  win over inherited values.
+ *
+ *  Exported for testing. The first argument is the "base" environment
+ *  (production: `process.env`); the second is the overrides. Pure, no
+ *  side effects. */
+export function buildSpawnedEnv(
+    base: Record<string, string | undefined>,
+    overrides: Record<string, string | undefined>,
+): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(base)) {
+        if (value === undefined) continue;
+        if (ENV_ALLOWLIST.has(key) || key.startsWith("COPILOT_")) {
+            out[key] = value;
+        }
+    }
+    for (const [key, value] of Object.entries(overrides)) {
+        if (value !== undefined) out[key] = value;
+    }
+    return out;
 }
 
 export interface CopilotSdkAdapterOptions {
@@ -89,10 +170,7 @@ export class CopilotSdkAdapter implements SdkAdapter {
         // EI-1 log catches the events that matter (per CD-01).
         const options: CopilotClientOptions = {
             cliPath,
-            env: {
-                ...process.env,
-                COPILOT_HOME: opts.copilotHome,
-            },
+            env: buildSpawnedEnv(process.env, { COPILOT_HOME: opts.copilotHome }),
             useLoggedInUser: true,
             autoStart: false,
             autoRestart: true,
@@ -130,12 +208,14 @@ export class CopilotSdkAdapter implements SdkAdapter {
     ): Promise<SdkSessionHandle> {
         const client = this.requireClient();
         const sdk = await loadSdkModule();
-        // ResumeSessionConfig requires onPermissionRequest. Default to
-        // approveAll if the caller didn't supply one (edge case — the
-        // PrimaryAgentPanel always supplies one).
+        // ResumeSessionConfig requires onPermissionRequest. Spread the
+        // caller's opts FIRST so a missing key falls through to our
+        // default (sdk.approveAll). The previous order put the default
+        // BEFORE the spread, which meant a caller-supplied
+        // `onPermissionRequest: undefined` would clobber the default.
         const cfg: ResumeSessionConfig = {
-            onPermissionRequest: opts?.onPermissionRequest ?? sdk.approveAll,
             ...(opts ?? {}),
+            onPermissionRequest: opts?.onPermissionRequest ?? sdk.approveAll,
         };
         const session = await client.resumeSession(sessionId, cfg);
         return wrapSession(session);
@@ -208,7 +288,11 @@ export class CopilotSdkAdapter implements SdkAdapter {
 
 /** Wrap a `CopilotSession` to expose it through our `SdkSessionHandle`
  *  interface. The SDK's `session.on(eventType, handler)` returns an
- *  unsubscribe function; our contract returns a `{ dispose }` disposable. */
+ *  unsubscribe function; our contract returns a `{ dispose }` disposable.
+ *  The SDK's strict event-typed handler is bridged through
+ *  `as unknown as` because consumers of `SdkSessionMessaging.on` don't
+ *  know the SDK's discriminated event union (per the boundary in
+ *  `SdkAdapter.ts`); each consumer narrows by reading `event.type`. */
 function wrapSession(session: CopilotSession): SdkSessionHandle {
     return {
         get sessionId() {

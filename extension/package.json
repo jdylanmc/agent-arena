@@ -22,11 +22,10 @@
   ],
   "activationEvents": [
     "onView:agentArenaPrimaryView",
+    "onCommand:agent-arena.openAgent",
     "onCommand:agent-arena.openPrimaryAgent",
     "onCommand:agent-arena.toggleYolo",
-    "onCommand:agent-arena.showTraceLog",
-    "onCommand:agent-arena.harness.export",
-    "onCommand:agent-arena.harness.import"
+    "onCommand:agent-arena.showTraceLog"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {
@@ -50,6 +49,10 @@
     },
     "commands": [
       {
+        "command": "agent-arena.openAgent",
+        "title": "Agent Arena: Open Agent"
+      },
+      {
         "command": "agent-arena.openPrimaryAgent",
         "title": "Agent Arena: Open Primary Agent"
       },
@@ -60,14 +63,6 @@
       {
         "command": "agent-arena.showTraceLog",
         "title": "Agent Arena: Show Trace Log"
-      },
-      {
-        "command": "agent-arena.harness.export",
-        "title": "Agent Arena: Export Harness..."
-      },
-      {
-        "command": "agent-arena.harness.import",
-        "title": "Agent Arena: Import Harness..."
       }
     ],
     "configuration": {
