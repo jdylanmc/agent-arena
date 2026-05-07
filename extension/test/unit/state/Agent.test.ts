@@ -109,6 +109,10 @@ interface FakeHandle {
 
 class FakeAdapter implements SdkAdapter {
     public lastCreateOpts: Record<string, unknown> | undefined;
+    public createCallCount = 0;
+    /** When set, createSession throws on calls where opts.model === this string,
+     *  simulating the SDK's "Model is not available" rejection. */
+    public rejectModel: string | undefined;
     public lastPermissionRequest: unknown;
     public lastPermissionResult: unknown;
     public sessions: Array<{ handle: FakeHandle; emit: (e: unknown) => void }> = [];
@@ -117,6 +121,11 @@ class FakeAdapter implements SdkAdapter {
     async stop(): Promise<void> {}
 
     async createSession(opts: unknown): Promise<SdkSessionHandle> {
+        this.createCallCount += 1;
+        const optsModel = (opts as { model?: string }).model;
+        if (this.rejectModel !== undefined && optsModel === this.rejectModel) {
+            throw new Error(`Model "${this.rejectModel}" is not available.`);
+        }
         this.lastCreateOpts = opts as Record<string, unknown>;
         const listeners = new Map<string, Array<(e: unknown) => void>>();
         const handle: FakeHandle = {
@@ -259,6 +268,78 @@ describe("Agent.submitPrompt — A1 streaming flag + A12 model config + A5 corre
         for (const evt of chain) {
             expect(evt.correlation_id).toBe("corr-from-envelope");
         }
+    });
+
+    it("retries createSession without model when SDK rejects with 'Model is not available'", async () => {
+        const sdk = new FakeAdapter();
+        sdk.rejectModel = "gpt-5.2-codex";
+        const emitter = new FakeEmitter();
+        const agent = buildAgent({
+            sdk,
+            emitter,
+            policy: new CapturingPolicy({ kind: "allow" }),
+            yolo: new FakeYoloStore(),
+            model: "gpt-5.2-codex",
+        });
+        await agent.submitPrompt("hi", "c1");
+        // Two createSession calls: first with model (rejected), second
+        // without model (succeeded).
+        expect(sdk.createCallCount).toBe(2);
+        expect(sdk.lastCreateOpts && "model" in sdk.lastCreateOpts).toBe(false);
+        // The agent should have proceeded — submitPrompt completed.
+        const sendStarted = emitter.eventsFor("aa.agent.send.started.v1");
+        expect(sendStarted).toHaveLength(1);
+        // And a warning emit was logged with the rejected model + fallback marker.
+        const warns = emitter.eventsFor("aa.agent.session.ensure_failed.v1");
+        expect(warns).toHaveLength(1);
+        const wpayload = warns[0]!.payload as { rejectedModel?: string; fallback?: string };
+        expect(wpayload.rejectedModel).toBe("gpt-5.2-codex");
+        expect(wpayload.fallback).toBe("retry_without_model");
+    });
+
+    it("does NOT retry when no model is configured (errors propagate as before)", async () => {
+        const sdk = new FakeAdapter();
+        // No rejectModel set — but force a different error.
+        sdk.rejectModel = "anything";
+        const agent = buildAgent({
+            sdk,
+            emitter: new FakeEmitter(),
+            policy: new CapturingPolicy({ kind: "allow" }),
+            yolo: new FakeYoloStore(),
+            // model is undefined here
+        });
+        await agent.submitPrompt("hi");
+        // Without a configured model, opts.model is undefined, doesn't
+        // match rejectModel, so no error — only one create call.
+        expect(sdk.createCallCount).toBe(1);
+    });
+
+    it("does NOT retry on non-model errors (re-throws)", async () => {
+        const sdk = new FakeAdapter();
+        const originalCreate = sdk.createSession.bind(sdk);
+        let calls = 0;
+        sdk.createSession = async (opts) => {
+            calls += 1;
+            if (calls === 1) throw new Error("authentication failed");
+            return originalCreate(opts);
+        };
+        const emitter = new FakeEmitter();
+        const agent = buildAgent({
+            sdk,
+            emitter,
+            policy: new CapturingPolicy({ kind: "allow" }),
+            yolo: new FakeYoloStore(),
+            model: "gpt-5.2-codex",
+        });
+        await agent.submitPrompt("hi");
+        // Only one create call — error propagated, no retry.
+        expect(calls).toBe(1);
+        const fails = emitter.eventsFor("aa.agent.session.ensure_failed.v1");
+        // The submitPrompt outer catch logs the error, but the payload
+        // should NOT carry the fallback marker.
+        expect(fails.length).toBeGreaterThan(0);
+        const fpayload = fails[0]!.payload as { fallback?: string };
+        expect(fpayload.fallback).toBeUndefined();
     });
 });
 

@@ -70,8 +70,8 @@
       "properties": {
         "agentArena.primaryAgent.model": {
           "type": "string",
-          "default": "gpt-5.2-codex",
-          "description": "Default model id for the primary agent. Resolved against the SDK's model listing at startup; falls back to the first available chat-class model if not entitled."
+          "default": "",
+          "description": "Optional model id for the primary agent (e.g. 'gpt-5', 'claude-sonnet-4.5'). Leave empty to let the Copilot SDK pick the default model the signed-in user is entitled to. If you set a model the SDK doesn't recognize for your account, the extension will retry without the model and surface a warning in the terminal."
         }
       }
     }

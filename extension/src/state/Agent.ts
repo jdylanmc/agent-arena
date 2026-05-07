@@ -373,7 +373,44 @@ export class Agent implements vscode.Disposable {
         };
         if (this.model !== undefined) sessionOpts.model = this.model;
 
-        const handle = await this.sdk.createSession(sessionOpts);
+        // Resilience: if the configured model isn't available to this
+        // user (e.g., a stale `agentArena.primaryAgent.model` setting
+        // pointing at a model the account isn't entitled to), the SDK
+        // throws `Model "<id>" is not available`. Retry once without
+        // the model so the agent works with the SDK's default — log a
+        // warning to the EI-1 trace so the user can find it via
+        // `Agent Arena: Show Trace Log`. We do NOT fire the
+        // `errorEmitter` here: that would render a fake error in the
+        // terminal and confuse the prompt/response flow even though
+        // the retry succeeded.
+        let handle;
+        try {
+            handle = await this.sdk.createSession(sessionOpts);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            const looksLikeModelRejection =
+                this.model !== undefined &&
+                /Model\s+"[^"]+"\s+is\s+not\s+available/i.test(message);
+            if (!looksLikeModelRejection) throw err;
+
+            this.emitter.emitNew({
+                level: "warn",
+                event: EVENT_NAMES.AA_AGENT_SESSION_ENSURE_FAILED,
+                agent_id: this.id,
+                correlation_id: sessionCorrelationId,
+                payload: {
+                    error: message,
+                    rejectedModel: this.model,
+                    fallback: "retry_without_model",
+                },
+            });
+
+            const fallbackOpts: Parameters<typeof this.sdk.createSession>[0] = {
+                ...sessionOpts,
+            };
+            delete (fallbackOpts as { model?: string }).model;
+            handle = await this.sdk.createSession(fallbackOpts);
+        }
         this.session = handle;
 
         this.emitter.emitNew({
