@@ -165,10 +165,23 @@ export class Agent implements vscode.Disposable {
         const trimmed = prompt.trim();
         if (trimmed.length === 0) return;
 
+        this.emitter.emitNew({
+            level: "info",
+            event: EVENT_NAMES.AA_AGENT_PROMPT_SUBMITTED,
+            agent_id: this.id,
+            payload: { promptPreview: trimmed.slice(0, 100), promptLength: trimmed.length },
+        });
+
         try {
             await this.ensureSession();
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
+            this.emitter.emitNew({
+                level: "error",
+                event: EVENT_NAMES.AA_AGENT_SESSION_ENSURE_FAILED,
+                agent_id: this.id,
+                payload: { error: message },
+            });
             this.transitionStatus("error");
             this.errorEmitter.fire({ message });
             return;
@@ -180,7 +193,31 @@ export class Agent implements vscode.Disposable {
         this.transcript.push({ turnId, chunks: [] });
         this.transitionStatus("running");
 
-        await this.session.send({ prompt: trimmed, mode: "enqueue" } as never);
+        this.emitter.emitNew({
+            level: "info",
+            event: EVENT_NAMES.AA_AGENT_SEND_STARTED,
+            agent_id: this.id,
+            payload: { turnId },
+        });
+        try {
+            await this.session.send({ prompt: trimmed, mode: "enqueue" } as never);
+            this.emitter.emitNew({
+                level: "info",
+                event: EVENT_NAMES.AA_AGENT_SEND_RETURNED,
+                agent_id: this.id,
+                payload: { turnId },
+            });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.emitter.emitNew({
+                level: "error",
+                event: EVENT_NAMES.AA_AGENT_SEND_FAILED,
+                agent_id: this.id,
+                payload: { turnId, error: message },
+            });
+            this.transitionStatus("error");
+            this.errorEmitter.fire({ message });
+        }
     }
 
     /** Toggle yolo state. Persists via YoloStore (CD-05); the active
@@ -241,6 +278,13 @@ export class Agent implements vscode.Disposable {
         const correlationId = mintCorrelationId();
         const policyResolver = this.policyResolver;
 
+        this.emitter.emitNew({
+            level: "info",
+            event: EVENT_NAMES.AA_AGENT_SESSION_ENSURE_STARTED,
+            agent_id: this.id,
+            payload: { sessionId },
+        });
+
         const handle = await this.sdk.createSession({
             sessionId,
             workingDirectory: this.workingDirectory,
@@ -271,8 +315,16 @@ export class Agent implements vscode.Disposable {
         } as never);
         this.session = handle;
 
+        this.emitter.emitNew({
+            level: "info",
+            event: EVENT_NAMES.AA_AGENT_SESSION_CREATED,
+            agent_id: this.id,
+            payload: { sessionId },
+        });
+
         // SDK event wiring. Both CopilotSdkAdapter (real) and FakeSdkAdapter
         // emit the SDK shape: `{ type, data: { deltaContent | content | ... } }`.
+        type SdkEventBase = { type: string; data?: Record<string, unknown> };
         type AssistantContentEvent = {
             type: string;
             data?: { deltaContent?: string; content?: string };
@@ -282,28 +334,47 @@ export class Agent implements vscode.Disposable {
             data?: { errorType?: string; message?: string };
         };
 
+        // Diagnostic: log every SDK event flowing through. Helps trace
+        // where a stalled turn is — if no AA_AGENT_SDK_EVENT entries
+        // appear after AA_AGENT_SEND_RETURNED, the SDK isn't streaming.
+        const logSdkEvent = (event: SdkEventBase): void => {
+            this.emitter.emitNew({
+                level: "info",
+                event: EVENT_NAMES.AA_AGENT_SDK_EVENT,
+                agent_id: this.id,
+                payload: { sdkEventType: event?.type ?? "<unknown>" },
+            });
+        };
+
         this.sdkSubscriptions.push(
-            handle.on<AssistantContentEvent>("assistant.message_delta", (event) =>
-                this.handleAssistantDelta(event),
-            ),
+            handle.on<AssistantContentEvent>("assistant.message_delta", (event) => {
+                logSdkEvent(event);
+                this.handleAssistantDelta(event);
+            }),
         );
         this.sdkSubscriptions.push(
-            handle.on<AssistantContentEvent>("assistant.streaming_delta", (event) =>
-                this.handleAssistantDelta(event),
-            ),
+            handle.on<AssistantContentEvent>("assistant.streaming_delta", (event) => {
+                logSdkEvent(event);
+                this.handleAssistantDelta(event);
+            }),
         );
         this.sdkSubscriptions.push(
-            handle.on<AssistantContentEvent>("assistant.message", (event) =>
-                this.handleAssistantFinal(event),
-            ),
+            handle.on<AssistantContentEvent>("assistant.message", (event) => {
+                logSdkEvent(event);
+                this.handleAssistantFinal(event);
+            }),
         );
         this.sdkSubscriptions.push(
-            handle.on<{ type: string }>("session.idle", () => this.handleSessionIdle()),
+            handle.on<SdkEventBase>("session.idle", (event) => {
+                logSdkEvent(event);
+                this.handleSessionIdle();
+            }),
         );
         this.sdkSubscriptions.push(
-            handle.on<SessionErrorEvent>("session.error", (event) =>
-                this.handleSessionError(event),
-            ),
+            handle.on<SessionErrorEvent>("session.error", (event) => {
+                logSdkEvent(event);
+                this.handleSessionError(event);
+            }),
         );
 
         this.transitionStatus("idle");

@@ -52,6 +52,14 @@ export const EVENT_NAMES = Object.freeze({
     AA_SDK_CLI_DEGRADED: "aa.sdk.cli.degraded.v1",
     AA_SDK_CLI_RESTART_ATTEMPTED: "aa.sdk.cli.restart_attempted.v1",
     AA_SDK_ADAPTER_SELECTED: "aa.sdk.adapter.selected.v1",
+    AA_AGENT_PROMPT_SUBMITTED: "aa.agent.prompt.submitted.v1",
+    AA_AGENT_SESSION_ENSURE_STARTED: "aa.agent.session.ensure_started.v1",
+    AA_AGENT_SESSION_CREATED: "aa.agent.session.created.v1",
+    AA_AGENT_SESSION_ENSURE_FAILED: "aa.agent.session.ensure_failed.v1",
+    AA_AGENT_SEND_STARTED: "aa.agent.send.started.v1",
+    AA_AGENT_SEND_RETURNED: "aa.agent.send.returned.v1",
+    AA_AGENT_SEND_FAILED: "aa.agent.send.failed.v1",
+    AA_AGENT_SDK_EVENT: "aa.agent.sdk.event.v1",
 
     AA_EVENT_HANDLER_FAILED: "aa.event_handler.failed.v1",
 
